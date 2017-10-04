@@ -1,4 +1,5 @@
-# Projectile Motion Analysis From Unstable Video ("Working Lists and Objectives")
+# Projectile Motion Analysis From Unstable Video 
+#### ("Working Lists and Objectives")
 ### L.J. Brown, Zihao Mao, Preston Deason, Austin Wiedebusch
 
 ## Cascade Classification
