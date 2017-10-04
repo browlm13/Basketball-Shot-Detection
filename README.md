@@ -1,11 +1,6 @@
 # Projectile Motion Analysis From Unstable Video
 ### L.J. Brown, Zihao Mao, Preston Deason, Austin Wiedebusch
 
-## Video Stabilization
-
-* Real-time video stabilization
-* Low CPU usage video stabilization
-
 ## Cascade Classification
 
 (Haar Feature-based Cascade Classifiers)
@@ -26,6 +21,11 @@
 * Trajectory
 * Hangtime
 * Velocity
+
+## Video Stabilization
+
+* Real-time video stabilization
+* Low CPU usage video stabilization
 
 ## Platform
 
