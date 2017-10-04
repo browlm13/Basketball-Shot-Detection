@@ -1,4 +1,4 @@
-# projectile-motion-analysis-from-unstable-video
+# Projectile Motion Analysis From Unstable Video
 
 ## Video Stabilization
 
@@ -25,3 +25,11 @@
 * Trajectory
 * Hangtime
 * Velocity
+
+## Platform
+
+* iOS
+
+## Libraries
+
+* OpenCV (Open Source Computer Vision)
