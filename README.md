@@ -1,4 +1,5 @@
 # Projectile Motion Analysis From Unstable Video
+### L.J. Brown, Zihao Mao, Preston Deason, Austin Wiedebusch
 
 ## Video Stabilization
 
