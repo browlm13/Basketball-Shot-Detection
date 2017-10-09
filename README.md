@@ -13,6 +13,11 @@
 - [ ] Basketball court line detection
 - [ ] Cutoff detection
 
+## Pose Estimation
+
+* Backboard Orientation
+* Key Orientation
+
 ## Trajectory Prediction 
 
 * Kalman filter
