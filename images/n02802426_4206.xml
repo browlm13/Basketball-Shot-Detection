@@ -1,0 +1,26 @@
+<annotation>
+	<folder>images</folder>
+	<filename>n02802426_4206.JPEG</filename>
+	<path>C:\Users\leima\Senior_Design\images\n02802426_4206.JPEG</path>
+	<source>
+		<database>Unknown</database>
+	</source>
+	<size>
+		<width>500</width>
+		<height>401</height>
+		<depth>3</depth>
+	</size>
+	<segmented>0</segmented>
+	<object>
+		<name>basketball</name>
+		<pose>Unspecified</pose>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+		<bndbox>
+			<xmin>253</xmin>
+			<ymin>185</ymin>
+			<xmax>291</xmax>
+			<ymax>227</ymax>
+		</bndbox>
+	</object>
+</annotation>
