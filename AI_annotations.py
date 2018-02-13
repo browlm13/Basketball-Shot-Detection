@@ -95,6 +95,13 @@ def image_dimensions(image_np):
   image_pil = Image.fromarray(np.uint8(image_np)).convert('RGB')
   return image_pil.size
 
+#path, folder, filename
+def get_path_data(path):
+  folder = os.path.basename(os.path.dirname(path))
+  filename = os.path.basename(path)
+  return path, folder, filename
+
+
 def selected_items_list(max_boxes_to_draw, min_score_thresh, selected_classes, image_np, boxes, scores, classes):
       # retrieve image size
       image_pil = Image.fromarray(np.uint8(image_np)).convert('RGB')
@@ -140,6 +147,39 @@ def selected_items_list(max_boxes_to_draw, min_score_thresh, selected_classes, i
       return selected_items
 
 #
+# crete image data sict with properties for xml annotation: folder, filename, path, width, height, depth(3), objects: class/name, xmin, ymin, xmax, ymax
+#
+
+def get_image_data(selected_items, image_np, image_path):
+
+  path, folder, filename = get_path_data(image_path)
+  width, height = image_dimensions(image_np)
+  depth = 3
+
+  image_data = {}
+  image_data['path'] = path
+  image_data['folder'] = folder
+  image_data['filename'] = filename
+  image_data['width'] = width
+  image_data['height'] = height
+  image_data['depth'] = depth
+
+  image_data['objects'] = []
+  for item in selected_items:
+    o = {}
+    o['name'] = item['class']
+
+    xmin, xmax, ymin, ymax = item['box']
+    o['xmin'] = xmin
+    o['ymin'] = ymin
+    o['xmax'] = xmax
+    o['ymax'] = ymax
+
+    image_data['objects'].append(o)
+
+  return image_data
+
+#
 # Test accuracy by writing new images
 #
 
@@ -163,8 +203,8 @@ def write_image_for_accuracy_test(output_directory_path, image_file_name, image_
 
 # add path to the images to the TEST_IMAGE_PATHS.
 PATH_TO_TEST_IMAGES_DIR = 'test_images'
-TEST_IMAGE_PATHS = [ os.path.join(PATH_TO_TEST_IMAGES_DIR, 'basketball_{}.JPEG'.format(i)) for i in range(0, 2596) ]
-#TEST_IMAGE_PATHS = [ os.path.join(PATH_TO_TEST_IMAGES_DIR, 'image1.jpg')]
+#TEST_IMAGE_PATHS = [ os.path.join(PATH_TO_TEST_IMAGES_DIR, 'basketball_{}.JPEG'.format(i)) for i in range(0, 1) ]
+TEST_IMAGE_PATHS = [ os.path.join(PATH_TO_TEST_IMAGES_DIR, 'image2.jpg')]
 
 # Output images
 PATH_TO_TEST_IMAGES_ACCURACY_DIR = 'check_image_accuracy'
@@ -185,13 +225,9 @@ selected_classes = ['person', 'sports ball']
 with detection_graph.as_default():
   with tf.Session(graph=detection_graph) as sess:
 
-    # Definite input and output Tensors for detection_graph
-    image_tensor = detection_graph.get_tensor_by_name('image_tensor:0')
-    # Each box represents a part of the image where a particular object was detected.
-    detection_boxes = detection_graph.get_tensor_by_name('detection_boxes:0')
-    # Each score represent how level of confidence for each of the objects.
-    # Score is shown on the result image, together with the class label.
-    detection_scores = detection_graph.get_tensor_by_name('detection_scores:0')
+    image_tensor = detection_graph.get_tensor_by_name('image_tensor:0')             # Definite input and output Tensors for detection_graph
+    detection_boxes = detection_graph.get_tensor_by_name('detection_boxes:0')       # Each box represents a part of the image where a particular object was detected.
+    detection_scores = detection_graph.get_tensor_by_name('detection_scores:0')     # Each score represent how level of confidence for each of the objects.
     detection_classes = detection_graph.get_tensor_by_name('detection_classes:0')
     num_detections = detection_graph.get_tensor_by_name('num_detections:0')
 
@@ -202,16 +238,31 @@ with detection_graph.as_default():
 
     for image_path in TEST_IMAGE_PATHS:
 
+      #
+      # meta data
+      #
+
+      image_path, image_folder, image_filename = get_path_data(image_path)
+
+      #
+      # prepare image for model input
+      #
+
       image = Image.open(image_path)
-      # the array based representation of the image will be used later in order to prepare the
-      # result image with boxes and labels on it.
       image_np = load_image_into_numpy_array(image)
-      # Expand dimensions since the model expects images to have shape: [1, None, None, 3]
-      image_np_expanded = np.expand_dims(image_np, axis=0)
-      # Actual detection.
+      image_np_expanded = np.expand_dims(image_np, axis=0) # Expand dimensions since the model expects images to have shape: [1, None, None, 3]
+      
+      #
+      # Detection
+      #
+
       (boxes, scores, classes, num) = sess.run(
           [detection_boxes, detection_scores, detection_classes, num_detections],
           feed_dict={image_tensor: image_np_expanded})
+
+      #
+      # Reformat results
+      #
 
       boxes = np.squeeze(boxes)
       scores = np.squeeze(scores)
@@ -226,41 +277,14 @@ with detection_graph.as_default():
       #
       # Properties for xml format
       #
-      # folder, filename, path, width, height, depth(3), objects: class/name, xmin, ymin, xmax, ymax
-      path = image_path
-      folder = os.path.basename(os.path.dirname(path))
-      filename = os.path.basename(image_path)
-      width, height = image_dimensions(image_np)
-      depth = 3
 
-      xml_values = {}
-      xml_values['path'] = path
-      xml_values['folder'] = folder
-      xml_values['filename'] = filename
-      xml_values['width'] = width
-      xml_values['height'] = height
-      xml_values['depth'] = depth
-
-      xml_objects = []
-      for item in selected_items:
-        o = {}
-        o['name'] = item['class']
-
-        xmin, xmax, ymin, ymax = item['box']
-        o['xmin'] = xmin
-        o['ymin'] = ymin
-        o['xmax'] = xmax
-        o['xmax'] = ymax
-
-        xml_objects.append(o)
-
-      print(xml_values)
-
+      image_data = get_image_data(selected_items, image_np, image_path)
 
       #
       # Test accuracy by writing new images
       #
-      write_image_for_accuracy_test(PATH_TO_TEST_IMAGES_ACCURACY_DIR, filename, image_np, selected_items)
+
+      write_image_for_accuracy_test(PATH_TO_TEST_IMAGES_ACCURACY_DIR, image_filename, image_np, selected_items)
 
 
     
