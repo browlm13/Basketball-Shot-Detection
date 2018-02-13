@@ -16,6 +16,9 @@ from PIL import Image
 import cv2
 import PIL.Image as Image
 
+import xml.etree.ElementTree as ET
+from xml.dom import minidom
+
 # This is needed since the file is stored in the object_detection folder.
 sys.path.append("..")
 
@@ -32,7 +35,7 @@ from utils import visualization_utils as vis_util
 # 
 # By default we use an "SSD with Mobilenet" model here. See the [detection model zoo](https://github.com/tensorflow/models/blob/master/research/object_detection/g3doc/detection_model_zoo.md) for a list of other models that can be run out-of-the-box with varying speeds and accuracies.
 
-# What model to download.
+# Model to download.
 MODEL_NAME = 'ssd_mobilenet_v1_coco_2017_11_17'
 MODEL_FILE = MODEL_NAME + '.tar.gz'
 DOWNLOAD_BASE = 'http://download.tensorflow.org/models/object_detection/'
@@ -123,14 +126,10 @@ def selected_items_list(max_boxes_to_draw, min_score_thresh, selected_classes, i
           box = (int(n_xmin * im_width), int(n_xmax * im_width), int(n_ymin * im_height), int(n_ymax * im_height)) #(left, right, top, bottom)
           item['box'] = box
 
-          #test coors
-          #(left, right, top, bottom) = box
-          #cv2.rectangle(image_np,(left,top),(right,bottom),(0,255,0),3)
-
           #
           # class name
           #
-          class_name = 'N/A'
+          class_name = 'NA'
           if classes[i] in category_index.keys(): class_name = str(category_index[classes[i]]['name'])
 
           item['class'] = class_name
@@ -164,6 +163,10 @@ def get_image_data(selected_items, image_np, image_path):
   image_data['height'] = height
   image_data['depth'] = depth
 
+  #unspecifeid
+  image_data['database'] = 'NA'
+  image_data['segmented'] = 0
+
   image_data['objects'] = []
   for item in selected_items:
     o = {}
@@ -174,6 +177,11 @@ def get_image_data(selected_items, image_np, image_path):
     o['ymin'] = ymin
     o['xmax'] = xmax
     o['ymax'] = ymax
+
+    #unspecifeid
+    o['pose'] = 'Unspecified'
+    o['truncated'] = 0
+    o['difficult'] = 0
 
     image_data['objects'].append(o)
 
@@ -195,6 +203,87 @@ def write_image_for_accuracy_test(output_directory_path, image_file_name, image_
   output_file = os.path.join(output_directory_path, image_file_name)
   cv2.imwrite(output_file, image_np)
 
+
+#
+# Writing Image XML annotations
+#
+
+def swap_exentsion(full_filename, new_extension):
+  template = "%s.%s" # filename, extension
+  filename_base, old_extension = os.path.splitext(full_filename)
+  return template % (filename_base, new_extension.strip('.'))
+
+def generate_new_filename(output_directory_path, image_data, new_extension):
+  new_filename = swap_exentsion(image_data['filename'], new_extension)
+  full_path = os.path.join(output_directory_path, new_filename)
+  return full_path
+
+def generate_xml_string(image_data):
+
+  # create XML 
+  annotation_tag = ET.Element('annotation')
+
+  folder_tag = ET.SubElement(annotation_tag, 'folder')
+  folder_tag.text = image_data['folder']
+
+  filename_tag = ET.SubElement(annotation_tag, 'filename')
+  filename_tag.text = image_data['filename']
+
+  path_tag = ET.SubElement(annotation_tag, 'path')
+  path_tag.text = image_data['path']
+
+  source_tag = ET.SubElement(annotation_tag, 'source')
+  database_tag = ET.SubElement(source_tag, 'database')
+  database_tag.text = image_data['database']
+
+  size_tag = ET.SubElement(annotation_tag, 'size')
+  width_tag = ET.SubElement(size_tag, 'width')
+  width_tag.text = str(image_data['width'])
+  height_tag = ET.SubElement(size_tag, 'height')
+  height_tag.text = str(image_data['height'])
+  depth_tag = ET.SubElement(size_tag, 'depth')
+  depth_tag.text = str(image_data['depth'])
+
+  segmented_tag = ET.SubElement(annotation_tag, 'segmented')
+  segmented_tag.text = str(0)
+
+  for o in image_data['objects']:
+    object_tag = ET.SubElement(annotation_tag, 'object')
+    name_tag = ET.SubElement(object_tag, 'name')
+    name_tag.text = o['name']
+    pose_tag = ET.SubElement(object_tag, 'pose')
+    pose_tag.text = o['pose']
+    truncated_tag = ET.SubElement(object_tag, 'truncated')
+    truncated_tag.text = str(o['truncated'])
+    difficult_tag = ET.SubElement(object_tag, 'difficult')
+    difficult_tag.text = str(o['difficult'])
+    bndbox_tag = ET.SubElement(object_tag, 'bndbox')
+    xmin_tag = ET.SubElement(bndbox_tag, 'xmin')
+    xmin_tag.text = str(o['xmin'])
+    ymin_tag = ET.SubElement(bndbox_tag, 'ymin')
+    ymin_tag.text = str(o['ymin'])
+    xmax_tag = ET.SubElement(bndbox_tag, 'xmax')
+    xmax_tag.text = str(o['xmax'])
+    ymax_tag = ET.SubElement(bndbox_tag, 'ymax')
+    ymax_tag.text = str(o['ymax'])
+
+  #return ET.tostring(annotation_tag).decode('utf-8')
+  dom = minidom.parseString(ET.tostring(annotation_tag).decode('utf-8'))
+  return dom.toprettyxml(indent='\t')
+
+def write_xml_file(image_data, outpath):
+  
+  # if directorydoes not exist, create it
+  if not os.path.exists(outpath):
+    os.makedirs(outpath)
+
+  xml_string = generate_xml_string(image_data)
+  xml_filename = generate_new_filename(outpath, image_data, 'xml')
+
+  with open(xml_filename, "w") as f:
+    f.write(xml_string)
+
+
 #
 # Images
 #
@@ -209,13 +298,17 @@ TEST_IMAGE_PATHS = [ os.path.join(PATH_TO_TEST_IMAGES_DIR, 'image2.jpg')]
 # Output images
 PATH_TO_TEST_IMAGES_ACCURACY_DIR = 'check_image_accuracy'
 
+# Output annotations
+PATH_TO_ANNOTATIONS_DIR = 'test_annotations'
+
+
 #
 # Settings
 #
 
 max_boxes_to_draw = 100
 min_score_thresh = 0.6
-selected_classes = ['person', 'sports ball']
+selected_classes = ['person'] # 'sports ball', 'dog'
 
 
 #
@@ -285,6 +378,12 @@ with detection_graph.as_default():
       #
 
       write_image_for_accuracy_test(PATH_TO_TEST_IMAGES_ACCURACY_DIR, image_filename, image_np, selected_items)
+
+      #
+      # Write annotations in new xml file
+      #
+
+      write_xml_file(image_data, PATH_TO_ANNOTATIONS_DIR)
 
 
     
