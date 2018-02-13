@@ -1,5 +1,5 @@
-
 #source: https://github.com/tensorflow/models/blob/master/research/object_detection/
+
 
 # coding: utf-8
 
@@ -23,36 +23,24 @@ from io import StringIO
 from matplotlib import pyplot as plt
 from PIL import Image
 
-# ## Env setup
+import cv2
+import PIL.Image as Image
 
-# In[2]:
-
-# This is needed to display the images.
-#get_ipython().magic('matplotlib inline')
-
-# This is needed since the notebook is stored in the object_detection folder.
+# This is needed since the file is stored in the object_detection folder.
 sys.path.append("..")
 
-
-# ## Object detection imports
-# Here are the imports from the object detection module.
-
-# In[3]:
-
 from utils import label_map_util
-
 from utils import visualization_utils as vis_util
 
+#
+# Model preparation 
+#
 
-# # Model preparation 
-
-# ## Variables
+# Variables
 # 
 # Any model exported using the `export_inference_graph.py` tool can be loaded here simply by changing `PATH_TO_CKPT` to point to a new .pb file.  
 # 
 # By default we use an "SSD with Mobilenet" model here. See the [detection model zoo](https://github.com/tensorflow/models/blob/master/research/object_detection/g3doc/detection_model_zoo.md) for a list of other models that can be run out-of-the-box with varying speeds and accuracies.
-
-# In[4]:
 
 # What model to download.
 MODEL_NAME = 'ssd_mobilenet_v1_coco_2017_11_17'
@@ -67,8 +55,10 @@ PATH_TO_LABELS = os.path.join('data', 'mscoco_label_map.pbtxt')
 
 NUM_CLASSES = 90
 
+#
+# Download Model
+#
 
-# ## Download Model
 """
 # In[5]:
 
@@ -81,9 +71,9 @@ for file in tar_file.getmembers():
     tar_file.extract(file, os.getcwd())
 """
 
-# ## Load a (frozen) Tensorflow model into memory.
-
-# In[6]:
+#
+# Load a (frozen) Tensorflow model into memory.
+#
 
 detection_graph = tf.Graph()
 with detection_graph.as_default():
@@ -93,20 +83,18 @@ with detection_graph.as_default():
     od_graph_def.ParseFromString(serialized_graph)
     tf.import_graph_def(od_graph_def, name='')
 
-
-# ## Loading label map
+#
+# Loading label map
 # Label maps map indices to category names, so that when our convolution network predicts `5`, we know that this corresponds to `airplane`.  Here we use internal utility functions, but anything that returns a dictionary mapping integers to appropriate string labels would be fine
-
-# In[7]:
+#
 
 label_map = label_map_util.load_labelmap(PATH_TO_LABELS)
 categories = label_map_util.convert_label_map_to_categories(label_map, max_num_classes=NUM_CLASSES, use_display_name=True)
 category_index = label_map_util.create_category_index(categories)
 
-
-# ## Helper code
-
-# In[8]:
+#
+# Helper code
+#
 
 def load_image_into_numpy_array(image):
   (im_width, im_height) = image.size
@@ -114,28 +102,59 @@ def load_image_into_numpy_array(image):
       (im_height, im_width, 3)).astype(np.uint8)
 
 
-# # Detection
+def selected_items_list(max_boxes_to_draw, min_score_thresh, image_np, boxes, scores, classes):
+      # retrieve image size
+      image_pil = Image.fromarray(np.uint8(image_np)).convert('RGB')
+      im_width, im_height = image_pil.size
 
-# In[9]:
+      #box, class, score
+      selected_items = []
 
-# For the sake of simplicity we will use only 2 images:
-# image1.jpg
-# image2.jpg
-# If you want to test the code with your images, just add path to the images to the TEST_IMAGE_PATHS.
+      for i in range(min(max_boxes_to_draw, boxes.shape[0])):
+        if scores is None or scores[i] > min_score_thresh:
+
+          item = {}
+
+          #
+          # box
+          #
+          normalized_box = tuple(boxes[i].tolist())
+          n_ymin, n_xmin, n_ymax, n_xmax = normalized_box
+          box = (int(n_xmin * im_width), int(n_xmax * im_width), int(n_ymin * im_height), int(n_ymax * im_height)) #(left, right, top, bottom)
+          item['box'] = box
+
+          #test coors
+          #(left, right, top, bottom) = box
+          #cv2.rectangle(image_np,(left,top),(right,bottom),(0,255,0),3)
+
+          #
+          # class name
+          #
+          class_name = 'N/A'
+          if classes[i] in category_index.keys(): class_name = str(category_index[classes[i]]['name'])
+          item['class'] = class_name
+          
+          #
+          # detection score
+          #
+          item['score'] = 100*scores[i]
+
+          selected_items.append(item)
+
+      return selected_items
+
+#
+# Images
+#
+
+# add path to the images to the TEST_IMAGE_PATHS.
 PATH_TO_TEST_IMAGES_DIR = 'test_images'
 #TEST_IMAGE_PATHS = [ os.path.join(PATH_TO_TEST_IMAGES_DIR, 'image{}.jpg'.format(i)) for i in range(1, 3) ]
-TEST_IMAGE_PATHS = [ os.path.join(PATH_TO_TEST_IMAGES_DIR, 'image2.jpg')]
+TEST_IMAGE_PATHS = [ os.path.join(PATH_TO_TEST_IMAGES_DIR, 'basketball_53.JPEG')]
 
-# Size, in inches, of the output images.
-IMAGE_SIZE = (12, 8)
-
-
-# In[10]:
-import cv2
-
-import PIL.Image as Image
-import PIL.ImageDraw as ImageDraw
-import collections
+#
+# Detection
+#
 
 with detection_graph.as_default():
   with tf.Session(graph=detection_graph) as sess:
@@ -163,52 +182,22 @@ with detection_graph.as_default():
 
 
       max_boxes_to_draw = 100
-      min_score_thresh = 0.6
+      min_score_thresh = 0.5
       boxes = np.squeeze(boxes)
       scores = np.squeeze(scores)
       classes = np.squeeze(classes).astype(np.int32)
 
+      selected_items = selected_items_list(max_boxes_to_draw, min_score_thresh, image_np, boxes, scores, classes)
 
-      # retrieve image size
-      image_pil = Image.fromarray(np.uint8(image_np)).convert('RGB')
-      im_width, im_height = image_pil.size
-
-      #box, class, score
-      selected_items = []
-
-      for i in range(min(max_boxes_to_draw, boxes.shape[0])):
-        if scores is None or scores[i] > min_score_thresh:
-
-          item = {}
-
-          #
-          # box
-          #
-          normalized_box = tuple(boxes[i].tolist())
-          n_ymin, n_xmin, n_ymax, n_xmax = normalized_box
-          box = (int(n_xmin * im_width), int(n_xmax * im_width), int(n_ymin * im_height), int(n_ymax * im_height)) #(left, right, top, bottom)
-          item['box'] = box
-
-
-          #test coors
-          (left, right, top, bottom) = box
-          cv2.rectangle(image_np,(left,top),(right,bottom),(0,255,0),3)
-
-          #
-          # class name
-          #
-          class_name = 'N/A'
-          if classes[i] in category_index.keys(): class_name = str(category_index[classes[i]]['name'])
-          item['class'] = class_name
-          
-          #
-          # detection score
-          #
-          item['score'] = 100*scores[i]
-
-          selected_items.append(item)
-
-      
       print(selected_items)
-      cv2.imwrite('AAA.png',image_np)
 
+      #
+      # Test accuracy by writing new images
+      #
+
+      for item in selected_items:
+
+        (left, right, top, bottom) = item['box']
+        cv2.rectangle(image_np,(left,top),(right,bottom),(0,255,0),3)
+      
+      cv2.imwrite('AAA.png',image_np)
