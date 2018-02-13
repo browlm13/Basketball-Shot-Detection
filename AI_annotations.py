@@ -1,15 +1,5 @@
 #source: https://github.com/tensorflow/models/blob/master/research/object_detection/
 
-
-# coding: utf-8
-
-# # Object Detection Demo
-# Welcome to the object detection inference walkthrough!  This notebook will walk you step by step through the process of using a pre-trained model to detect objects in an image. Make sure to follow the [installation instructions](https://github.com/tensorflow/models/blob/master/research/object_detection/g3doc/installation.md) before you start.
-
-# # Imports
-
-# In[1]:
-
 import numpy as np
 import os
 import six.moves.urllib as urllib
@@ -101,8 +91,11 @@ def load_image_into_numpy_array(image):
   return np.array(image.getdata()).reshape(
       (im_height, im_width, 3)).astype(np.uint8)
 
+def image_dimensions(image_np):
+  image_pil = Image.fromarray(np.uint8(image_np)).convert('RGB')
+  return image_pil.size
 
-def selected_items_list(max_boxes_to_draw, min_score_thresh, image_np, boxes, scores, classes):
+def selected_items_list(max_boxes_to_draw, min_score_thresh, selected_classes, image_np, boxes, scores, classes):
       # retrieve image size
       image_pil = Image.fromarray(np.uint8(image_np)).convert('RGB')
       im_width, im_height = image_pil.size
@@ -132,6 +125,7 @@ def selected_items_list(max_boxes_to_draw, min_score_thresh, image_np, boxes, sc
           #
           class_name = 'N/A'
           if classes[i] in category_index.keys(): class_name = str(category_index[classes[i]]['name'])
+
           item['class'] = class_name
           
           #
@@ -139,18 +133,50 @@ def selected_items_list(max_boxes_to_draw, min_score_thresh, image_np, boxes, sc
           #
           item['score'] = 100*scores[i]
 
-          selected_items.append(item)
+          # add if class is in selected_classes
+          if item['class'] in selected_classes:
+            selected_items.append(item)
 
       return selected_items
+
+#
+# Test accuracy by writing new images
+#
+
+def write_image_for_accuracy_test(output_directory_path, image_file_name, image_np, selected_items):
+
+  for item in selected_items:
+
+    #test coors acuracy
+    (left, right, top, bottom) = item['box']
+    cv2.rectangle(image_np,(left,top),(right,bottom),(0,255,0),3)
+
+  #write
+  output_file = os.path.join(output_directory_path, image_file_name)
+  cv2.imwrite(output_file, image_np)
 
 #
 # Images
 #
 
+# Input images
+
 # add path to the images to the TEST_IMAGE_PATHS.
 PATH_TO_TEST_IMAGES_DIR = 'test_images'
-#TEST_IMAGE_PATHS = [ os.path.join(PATH_TO_TEST_IMAGES_DIR, 'image{}.jpg'.format(i)) for i in range(1, 3) ]
-TEST_IMAGE_PATHS = [ os.path.join(PATH_TO_TEST_IMAGES_DIR, 'basketball_53.JPEG')]
+TEST_IMAGE_PATHS = [ os.path.join(PATH_TO_TEST_IMAGES_DIR, 'basketball_{}.JPEG'.format(i)) for i in range(0, 2596) ]
+#TEST_IMAGE_PATHS = [ os.path.join(PATH_TO_TEST_IMAGES_DIR, 'image1.jpg')]
+
+# Output images
+PATH_TO_TEST_IMAGES_ACCURACY_DIR = 'check_image_accuracy'
+
+#
+# Settings
+#
+
+max_boxes_to_draw = 100
+min_score_thresh = 0.6
+selected_classes = ['person', 'sports ball']
+
 
 #
 # Detection
@@ -168,7 +194,14 @@ with detection_graph.as_default():
     detection_scores = detection_graph.get_tensor_by_name('detection_scores:0')
     detection_classes = detection_graph.get_tensor_by_name('detection_classes:0')
     num_detections = detection_graph.get_tensor_by_name('num_detections:0')
+
+
+    #
+    # Image Detection Loop
+    #
+
     for image_path in TEST_IMAGE_PATHS:
+
       image = Image.open(image_path)
       # the array based representation of the image will be used later in order to prepare the
       # result image with boxes and labels on it.
@@ -180,24 +213,55 @@ with detection_graph.as_default():
           [detection_boxes, detection_scores, detection_classes, num_detections],
           feed_dict={image_tensor: image_np_expanded})
 
-
-      max_boxes_to_draw = 100
-      min_score_thresh = 0.5
       boxes = np.squeeze(boxes)
       scores = np.squeeze(scores)
       classes = np.squeeze(classes).astype(np.int32)
 
-      selected_items = selected_items_list(max_boxes_to_draw, min_score_thresh, image_np, boxes, scores, classes)
+      #
+      # Get selected items (box, class, score)
+      #
 
-      print(selected_items)
+      selected_items = selected_items_list(max_boxes_to_draw, min_score_thresh, selected_classes, image_np, boxes, scores, classes)
+
+      #
+      # Properties for xml format
+      #
+      # folder, filename, path, width, height, depth(3), objects: class/name, xmin, ymin, xmax, ymax
+      path = image_path
+      folder = os.path.basename(os.path.dirname(path))
+      filename = os.path.basename(image_path)
+      width, height = image_dimensions(image_np)
+      depth = 3
+
+      xml_values = {}
+      xml_values['path'] = path
+      xml_values['folder'] = folder
+      xml_values['filename'] = filename
+      xml_values['width'] = width
+      xml_values['height'] = height
+      xml_values['depth'] = depth
+
+      xml_objects = []
+      for item in selected_items:
+        o = {}
+        o['name'] = item['class']
+
+        xmin, xmax, ymin, ymax = item['box']
+        o['xmin'] = xmin
+        o['ymin'] = ymin
+        o['xmax'] = xmax
+        o['xmax'] = ymax
+
+        xml_objects.append(o)
+
+      print(xml_values)
+
 
       #
       # Test accuracy by writing new images
       #
+      write_image_for_accuracy_test(PATH_TO_TEST_IMAGES_ACCURACY_DIR, filename, image_np, selected_items)
 
-      for item in selected_items:
 
-        (left, right, top, bottom) = item['box']
-        cv2.rectangle(image_np,(left,top),(right,bottom),(0,255,0),3)
-      
-      cv2.imwrite('AAA.png',image_np)
+    
+
