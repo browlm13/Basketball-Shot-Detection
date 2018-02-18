@@ -436,11 +436,28 @@ class Image_Evaluator:
 		""" given input directory of images (currently JPEG), move selected images that satisfy bool rule to new directory, create annotation directory (xml) if specifeid. """
 
 		# get all image paths in directory
-		accpeted_extensions = ['jpg', 'JPEG']
+		accpeted_extensions = ['jpg', 'JPEG', 'jpeg']
 		image_path_list = []
 		for extension in accpeted_extensions:
 			glob_phrase = os.path.join(input_image_directory_path, '*.' + extension)
-			image_path_list += glob.glob(glob_phrase)
+
+			for image_path in glob.glob(glob_phrase):
+
+				#check image can be reshpaed tmp
+				try:	
+					script_dir = os.path.dirname(os.path.abspath(__file__))
+					image = Image.open(os.path.join(script_dir, image_path))
+					image_np = self.load_image_into_numpy_array(image)
+					image_np_expanded = np.expand_dims(image_np, axis=0) # Expand dimensions since the model 
+
+					#add
+					image_path_list += [image_path]
+
+					#tmp
+					print(image_path)
+				except: 
+					print("error loading: %s" % image_path)
+
 		
 		# evaluate
 		image_boolean_bundel, image_info_bundel = self.boolean_image_evaluation(image_path_list, bool_rule)
@@ -495,5 +512,5 @@ def run():
 	image_input_directory_path = "/Users/ljbrown/Desktop/StatGeek/image_collecting/google-images-download/downloads/Basketball"
 	image_output_directory_path = "/Users/ljbrown/Desktop/StatGeek/image_collecting/gather/images"
 	annotation_output_directory_path = "/Users/ljbrown/Desktop/StatGeek/image_collecting/gather/annotations"
-	bool_rule = "(any('basketball', 85.0) and not any('person', 15.0)) or ((num('person', 95.0) == 1) and not any('basketball', 15.0))"
+	bool_rule = "(any('basketball', 85.0) and not any('person', 15.0)) or ((num('person', 95.0) == 1) and not any('basketball', 15.0)) or (any('basketball', 85.0) and (num('person', 95.0) ==1))"
 	ie.move_images_bool_rule(image_input_directory_path, image_output_directory_path, bool_rule, annotation_output_directory_path, 85.0, ['basketball', 'person'])
