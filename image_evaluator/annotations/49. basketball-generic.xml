@@ -1,0 +1,27 @@
+<?xml version="1.0" ?>
+<annotation>
+	<folder>Basketball</folder>
+	<filename>49. basketball-generic.jpg</filename>
+	<path>/Users/ljbrown/Desktop/StatGeek/image_collecting/google-images-download/downloads/Basketball/49. basketball-generic.jpg</path>
+	<source>
+		<database>NA</database>
+	</source>
+	<size>
+		<width>370</width>
+		<height>658</height>
+		<depth>3</depth>
+	</size>
+	<segmented>0</segmented>
+	<object>
+		<name>basketball</name>
+		<pose>Unspecified</pose>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+		<bndbox>
+			<xmin>355</xmin>
+			<ymin>4</ymin>
+			<xmax>655</xmax>
+			<ymax>370</ymax>
+		</bndbox>
+	</object>
+</annotation>

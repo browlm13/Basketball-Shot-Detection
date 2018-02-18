@@ -1,0 +1,51 @@
+<?xml version="1.0" ?>
+<annotation>
+	<folder>Basketball</folder>
+	<filename>47. bball.jpg</filename>
+	<path>/Users/ljbrown/Desktop/StatGeek/image_collecting/google-images-download/downloads/Basketball/47. bball.jpg</path>
+	<source>
+		<database>NA</database>
+	</source>
+	<size>
+		<width>1800</width>
+		<height>2880</height>
+		<depth>3</depth>
+	</size>
+	<segmented>0</segmented>
+	<object>
+		<name>person</name>
+		<pose>Unspecified</pose>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+		<bndbox>
+			<xmin>163</xmin>
+			<ymin>9</ymin>
+			<xmax>2842</xmax>
+			<ymax>1782</ymax>
+		</bndbox>
+	</object>
+	<object>
+		<name>sports ball</name>
+		<pose>Unspecified</pose>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+		<bndbox>
+			<xmin>741</xmin>
+			<ymin>1107</ymin>
+			<xmax>1232</xmax>
+			<ymax>1599</ymax>
+		</bndbox>
+	</object>
+	<object>
+		<name>basketball</name>
+		<pose>Unspecified</pose>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+		<bndbox>
+			<xmin>740</xmin>
+			<ymin>1072</ymin>
+			<xmax>1239</xmax>
+			<ymax>1616</ymax>
+		</bndbox>
+	</object>
+</annotation>
