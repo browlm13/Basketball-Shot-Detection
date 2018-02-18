@@ -7,7 +7,6 @@
 
 	img_eval = Image_Evaluator()
 
-
 	# Loading Models - Todo: store in file so only model name has to be used
 
 	BASKETBALL_MODEL = {'name' : 'basketball_model', 'paths' : {'frozen graph': PATH_TO_FROZEN_GRAPH, 'labels' : PATH_TO_LABELS}}
@@ -16,25 +15,26 @@
 	img_eval.load_models([BASKETBALL_MODEL, PERSON_MODEL])
 
 
-	#todo:
-	allow input directory instead of image_path_list
+	todo: img_eval.annotate_directory(image_directory, annotations_directory) #Add selected categories and minscores
 
-	input_directory, output_directory
-	bool_rule = "any('basketball',60.0)"
-	img_eval.move_images_bool_rule(input_directory, output_directory, bool_rule)
-
-	img_eval.annotate_directory(image_directory, annotations_directory) #Add selected categories and minscores
+	todo: cropping
 
 
 """
-import tensorflow as tf
-from utils import label_map_util
 import numpy as np
 import os
 from PIL import Image
 import PIL.Image as Image
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
+import tensorflow as tf
+from utils import label_map_util
+
+import glob
+import shutil
+#from shutil import copyfile
+#from shutil import copy
+
 
 
 class Image_Evaluator:
@@ -97,7 +97,6 @@ class Image_Evaluator:
 			if self.categories[c]['evaluation_model'] == model_name:
 				evaluation_categories.append(c)
 		return evaluation_categories
-
 
 	def load_image_into_numpy_array(self, image):
 		(im_width, im_height) = image.size
@@ -216,6 +215,28 @@ class Image_Evaluator:
 		with open(xml_filename, "w") as f:
 			f.write(xml_string)
 
+	def filter_minimum_score_threshold(self, image_info_bundel, min_score_thresh):
+		filtered_image_info_bundel = {}
+		for image_path, image_info in image_info_bundel.items():
+			filtered_image_info_bundel[image_path] = image_info
+			filtered_image_items_list = []
+			for item in image_info['image_items_list']:
+				if item['score'] > min_score_thresh:
+					filtered_image_items_list.append(item)
+			filtered_image_info_bundel[image_path]['image_items_list'] = filtered_image_items_list
+		return filtered_image_info_bundel
+
+	def filter_selected_categories(self, image_info_bundel, selected_categories_list):
+		filtered_image_info_bundel = {}
+		for image_path, image_info in image_info_bundel.items():			
+			filtered_image_info_bundel[image_path] = image_info
+			filtered_image_items_list = []
+			for item in image_info['image_items_list']:
+				if item['class'] in selected_categories_list:
+					filtered_image_items_list.append(item)
+			filtered_image_info_bundel[image_path]['image_items_list'] = filtered_image_items_list
+		return filtered_image_info_bundel		
+
 	def _image_info(self, category_index, selected_categories, image_np, boxes, scores, classes, min_score_thresh=0.0001):
 		# retrieve image size
 		image_pil = Image.fromarray(np.uint8(image_np)).convert('RGB')
@@ -257,7 +278,7 @@ class Image_Evaluator:
 		return item_list
 
 
-	def get_image_info(self, image_path_list, min_score_thresh=None):
+	def get_image_info(self, image_path_list, min_score_thresh=None, prevent_overlap=True):
 
 		image_info_bundel = dict((image_path, {'image_items_list':[], 'image_folder':'', 'image_filename':'','image_path':'', 'image_height':-1, 'image_width':-1}) for image_path in image_path_list)	#key= path, value is cobined item list
 
@@ -320,6 +341,16 @@ class Image_Evaluator:
 
 						(boxes, scores, classes, num) = sess.run([detection_boxes, detection_scores, detection_classes, num_detections],
 																											feed_dict={image_tensor: image_np_expanded})
+						"""
+						# new code
+						if prevent_overlap:
+							iou_threshold = 0.5	#overlap threshold
+							max_output_size = 2 #max num boxes overlap threshold
+							selected_indices = tf.image.non_max_suppression( boxes, scores, max_output_size, iou_threshold)
+							boxes = tf.gather(boxes, selected_indices) #returns selected boxes
+							scores = tf.gather(np.squeeze(scores), selected_indices) #returns selected 
+							classes = tf.gather(np.squeeze(classes), selected_indices) #returns selected
+						"""
 
 						#
 						# Reformat results
@@ -328,6 +359,7 @@ class Image_Evaluator:
 						boxes = np.squeeze(boxes)
 						scores = np.squeeze(scores)
 						classes = np.squeeze(classes).astype(np.int32)
+
 
 						#
 						# Get selected items (box, class, score)
@@ -361,7 +393,6 @@ class Image_Evaluator:
 						image_info_bundel[image_path]['image_width'] = image_width
 
 		return image_info_bundel
-
 
 	def remove_string_start_end_whitespace(self, string):
 		if string[0] == ' ':
@@ -399,7 +430,60 @@ class Image_Evaluator:
 
 			image_boolean_bundel[image_path] = eval(boolean_categories_present, scope)
 
-		return image_boolean_bundel
+		return image_boolean_bundel, image_info_bundel
+
+	def move_images_bool_rule(self, input_image_directory_path, image_output_directory_path, bool_rule, annotations_output_directory_path = False, annotations_min_score_thresh=None, annotations_selected_category_list=None):
+		""" given input directory of images (currently JPEG), move selected images that satisfy bool rule to new directory, create annotation directory (xml) if specifeid. """
+
+		# get all image paths in directory
+		accpeted_extensions = ['jpg', 'JPEG']
+		image_path_list = []
+		for extension in accpeted_extensions:
+			glob_phrase = os.path.join(input_image_directory_path, '*.' + extension)
+			image_path_list += glob.glob(glob_phrase)
+		
+		# evaluate
+		image_boolean_bundel, image_info_bundel = self.boolean_image_evaluation(image_path_list, bool_rule)
+
+		# if image output directory does not exist, create it
+		if not os.path.exists(image_output_directory_path): os.makedirs(image_output_directory_path)
+
+		# copy images over with same basename
+		for image_path, copy_bool in image_boolean_bundel.items():
+			if copy_bool: shutil.copy(image_path, image_output_directory_path)
+
+
+		#annotations
+		# if image output directory does not exist, create it
+		if annotations_output_directory_path is not False:
+			if not os.path.exists(annotations_output_directory_path): os.makedirs(annotations_output_directory_path)
+
+			#filter selected categories and min score threshold for image_info_bundel
+			if annotations_selected_category_list is not None:
+				image_info_bundel = self.filter_selected_categories(image_info_bundel, annotations_selected_category_list)
+			if annotations_min_score_thresh is not None:
+				image_info_bundel = self.filter_minimum_score_threshold(image_info_bundel, annotations_min_score_thresh)
+
+			#change image location data and write xml file
+			for image_path, image_info in image_info_bundel.items():
+
+				#if bool statment is true
+				if image_boolean_bundel[image_path]:
+
+					#change image location info
+					new_image_info = image_info
+
+					new_image_filename = os.path.basename(image_path)	#same technically
+					new_image_folder = os.path.basename(image_output_directory_path)
+					new_image_path = os.path.join(image_output_directory_path, new_image_filename)
+
+					new_image_info['image_path'] = new_image_path
+					new_image_info['image_folder'] = new_image_folder
+					new_image_info['image_filename'] = new_image_filename
+
+					#write
+					self.write_xml_file(new_image_info, annotations_output_directory_path)
+		
 
 def run():
 	BASKETBALL_MODEL = {'name' : 'basketball_model_v1', 'use_display_name' : False, 'paths' : {'frozen graph': "models/basketball_model_v1/frozen_inference_graph/frozen_inference_graph.pb", 'labels' : "models/basketball_model_v1/label_map.pbtxt"}}
@@ -407,13 +491,9 @@ def run():
 
 	ie = Image_Evaluator()
 	ie.load_models([BASKETBALL_MODEL, PERSON_MODEL])
-	image_path_list = ["/Users/ljbrown/Desktop/StatGeek/image_collecting/google-images-download/downloads/Basketball/basketball_310.JPEG","/Users/ljbrown/Desktop/StatGeek/image_collecting/google-images-download/downloads/Basketball/49. basketball-generic.jpg", "/Users/ljbrown/Desktop/StatGeek/image_collecting/google-images-download/downloads/Basketball/47. bball.jpg"]
-	boolean_categories_present_statement = "(any('person',60.0) and not any('basketball', 20.0)) or (any('basketball', 45.0) and not any('person', 20.0))"  #"any('person',30.0) or (num('basketball', 60.0) > 2)"
-	image_boolean_bundel = ie.boolean_image_evaluation(image_path_list, boolean_categories_present_statement)
-	image_info_bundel = ie.get_image_info(image_path_list, 60.0)
 
-	#make simple xml function for writing all images in image_info_bundel to directory
-	#also make function to write all images satisfying boolean expression to a directory
-	outpath = 'annotations/'
-	for image_path, image_info in image_info_bundel.items():
-		ie.write_xml_file(image_info, outpath)
+	image_input_directory_path = "/Users/ljbrown/Desktop/StatGeek/image_collecting/google-images-download/downloads/Basketball"
+	image_output_directory_path = "/Users/ljbrown/Desktop/StatGeek/image_collecting/gather/images"
+	annotation_output_directory_path = "/Users/ljbrown/Desktop/StatGeek/image_collecting/gather/annotations"
+	bool_rule = "(any('basketball', 85.0) and not any('person', 15.0)) or ((num('person', 95.0) == 1) and not any('basketball', 15.0))"
+	ie.move_images_bool_rule(image_input_directory_path, image_output_directory_path, bool_rule, annotation_output_directory_path, 85.0, ['basketball', 'person'])
