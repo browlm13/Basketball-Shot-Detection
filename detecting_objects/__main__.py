@@ -292,7 +292,12 @@ if __name__ == '__main__':
 	# test load and write frame
 	#
 
-	"""
+	ball_marks = []
+	ball_radii = []
+
+	person_marks = []
+
+
 	for frame in range(225, 263):
 		#frame = 259 #225
 		frame_path = frame_path_dict[frame]
@@ -304,11 +309,31 @@ if __name__ == '__main__':
 
 		ball_box = get_high_score_box(image_info, 'basketball')
 		ball_mark = get_ball_mark(ball_box)
+		ball_radius = get_ball_radius(ball_box)
+
+		#add to history
+		person_marks.append(person_mark)
+		ball_marks.append(ball_mark)
+		ball_radii.append(ball_radius)
 
 		outside_mark = get_ball_outside_mark(person_box, ball_box)
 
 		#test draw boxes
 		#image_np = draw_all_boxes_image_np(image_np, image_info)
+		#test draw basketball outline
+		image_np = draw_circle(image_np, ball_mark, radius=ball_radius, color=(0,255,0), thickness=2)
+
+		#draw history with decreasing brighness
+		for i in range(len(ball_marks)):
+
+			for j in range(i-1):
+				k = j+1
+				draw_person_ball_connector(image_np, ball_marks[j], ball_marks[k])
+
+			image_np = draw_circle(image_np, ball_marks[i], color=(200,200,255))
+			#image_np = draw_circle(image_np, person_marks[i], color=(200,200,255))
+
+			#image_np = draw_circle(image_np, ball_marks[i], radius=ball_radii[i], color=(0,100,0), thickness=2)
 
 		#test draw person mark
 		image_np = draw_circle(image_np, person_mark)
@@ -321,7 +346,7 @@ if __name__ == '__main__':
 		image_np = draw_person_ball_connector(image_np, person_mark, outside_mark)
 
 		write_frame_for_accuracy_test(output_image_directory, frame, image_np)
-	"""
+
 
 	# test write video
 	output_frame_paths_dict = get_frame_path_dict(output_image_directory)
@@ -329,4 +354,4 @@ if __name__ == '__main__':
 	for frame in range(225, 263):
 		ordered_frame_paths.append(output_frame_paths_dict[frame])
 
-	write_mp4_video(ordered_frame_paths, 'JPEG', 'output_video/tracking.mp4')
+	write_mp4_video(ordered_frame_paths, 'JPEG', 'output_video/tracking_3.mp4')
