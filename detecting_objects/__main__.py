@@ -38,6 +38,16 @@ def draw_all_boxes_image_np(image_np, image_info):
 		draw_box_image_np(image_np, item['box'])
 	return image_np
 
+def get_category_box_score_tuple_list(image_info, category):
+	score_list = []
+	box_list = []
+	for item in image_info['image_items_list']:
+		if item['class'] == category:
+			box_list.append(item['box'])
+			score_list.append(item['score'])
+	return list(zip(score_list, box_list))
+
+
 def load_image_np(image_path):
 	#non relitive path
 	script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -178,6 +188,8 @@ if __name__ == '__main__':
 	first_frame_path = frame_path_dict[first_frame]
 	first_frame_image_np = load_image_np(first_frame_path)
 	first_frame_image_info = image_info_bundel[first_frame_path]
+
+	print(get_category_box_score_tuple_list(first_frame_image_info, 'basketball'))
 
 	#test draw boxes
 	first_frame_image_np = draw_all_boxes_image_np(first_frame_image_np, first_frame_image_info)
