@@ -22,6 +22,28 @@ logger = logging.getLogger(__name__)
 # Test accuracy by writing new images
 #
 
+#ext = extension
+#source: http://tsaith.github.io/combine-images-into-a-video-with-python-3-and-opencv-3.html
+def write_mp4_video(ordered_image_paths, ext, output_mp4_filepath):
+
+	# Determine the width and height from the first image
+	image_path = ordered_image_paths[0] 
+	frame = cv2.imread(image_path)
+	cv2.imshow('video',frame)
+	height, width, channels = frame.shape
+
+	# Define the codec and create VideoWriter object
+	fourcc = cv2.VideoWriter_fourcc(*'mp4v') # Be sure to use lower case
+	out = cv2.VideoWriter(output_mp4_filepath, fourcc, 20.0, (width, height))
+
+	for image_path in ordered_image_paths:
+	    frame = cv2.imread(image_path)
+	    out.write(frame) # Write out frame to video
+
+	# Release everything if job is finished
+	out.release()
+
+
 def write_frame_for_accuracy_test(output_directory_path, frame, image_np):
 	image_file_name = "frame_%d.JPEG" % frame 
 	output_file = os.path.join(output_directory_path, image_file_name)
@@ -222,7 +244,7 @@ if __name__ == '__main__':
 	# Initial Evaluation
 	#
 
-	#video frames diretory (basketball_225.JPEG - basketball_323.JPEG)
+	#video frames diretory (basketball_225.JPEG - basketball_262.JPEG)
 	video_frames_dirpath = "/Users/ljbrown/Desktop/StatGeek/object_detection/video_frames/"
 
 	#output images directory for checking
@@ -270,7 +292,8 @@ if __name__ == '__main__':
 	# test load and write frame
 	#
 
-	for frame in range(225, 324):
+	"""
+	for frame in range(225, 263):
 		#frame = 259 #225
 		frame_path = frame_path_dict[frame]
 		image_np = load_image_np(frame_path)
@@ -298,3 +321,12 @@ if __name__ == '__main__':
 		image_np = draw_person_ball_connector(image_np, person_mark, outside_mark)
 
 		write_frame_for_accuracy_test(output_image_directory, frame, image_np)
+	"""
+
+	# test write video
+	output_frame_paths_dict = get_frame_path_dict(output_image_directory)
+	ordered_frame_paths = []
+	for frame in range(225, 263):
+		ordered_frame_paths.append(output_frame_paths_dict[frame])
+
+	write_mp4_video(ordered_frame_paths, 'JPEG', 'output_video/tracking.mp4')
