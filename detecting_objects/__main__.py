@@ -8,6 +8,7 @@ import cv2
 import json
 import PIL.Image as Image
 import numpy as np
+import math
 
 # my lib
 #from image_evaluator.src import image_evaluator
@@ -47,6 +48,79 @@ def get_category_box_score_tuple_list(image_info, category):
 			score_list.append(item['score'])
 	return list(zip(score_list, box_list))
 
+
+def get_high_score_box(image_info, category):
+	category_box_score_tuple_list = get_category_box_score_tuple_list(image_info, category)
+
+	high_score_index = 0
+	high_score_value = 0
+
+	index = 0
+	for item in category_box_score_tuple_list:
+		if item[0] > high_score_value:
+			high_score_index = index
+			high_score_value = item[0]
+		index += 1
+
+	return category_box_score_tuple_list[high_score_index][1]
+
+
+def get_person_mark(person_box):
+	# 3/4 height, 1/2 width
+	(left, right, top, bottom) = person_box
+	width = int((right - left)/2)
+	x = left + width
+	height = int((bottom - top)*float(1.0/4.0))
+	y = top + height
+	return (x,y)
+
+def get_ball_mark(ball_box):
+	# 1/2 height, 1/2 width
+	(left, right, top, bottom) = ball_box
+	width = int((right - left)/2)
+	x = left + width
+	height = int((bottom - top)/2)
+	y = top + height
+	return (x,y)
+
+def get_angle_between_points(mark1, mark2):
+	x1, y1 = mark1
+	x2, y2 = mark2
+	radians = math.atan2(y1-y2,x1-x2)
+	return radians
+
+def get_ball_radius(ball_box):
+	(left, right, top, bottom) = ball_box
+	return int((right - left)/2)
+
+
+def get_ball_outside_mark(person_box, ball_box):
+	# mark on circumfrence of ball pointing twords person mark
+	ball_mark = get_ball_mark(ball_box)
+	person_mark = get_person_mark(person_box)
+
+	ball_radius = get_ball_radius(ball_box)
+	angle = get_angle_between_points(person_mark, ball_mark)
+
+	dy = int(ball_radius * math.sin(angle))
+	dx = int(ball_radius * math.cos(angle))
+
+	outside_mark = (ball_mark[0] + dx, ball_mark[1] + dy)
+	return outside_mark
+
+
+
+
+
+#center (x,y), color (r,g,b)
+def draw_circle(image_np, center, radius=2, color=(0,0,255), thickness=10, lineType=8, shift=0):
+	cv2.circle(image_np, center, radius, color, thickness=thickness, lineType=lineType, shift=shift)
+	return image_np
+
+def draw_person_ball_connector(image_np, person_mark, ball_mark):
+	lineThickness = 7
+	cv2.line(image_np, person_mark, ball_mark, (255,0,0), lineThickness)
+	return image_np
 
 def load_image_np(image_path):
 	#non relitive path
@@ -173,25 +247,54 @@ if __name__ == '__main__':
 
 	#filter selected categories and min socre
 	selected_categories_list = ['basketball', 'person']
-	min_score_thresh = 45.0
+	min_score_thresh = 1.0
 	image_info_bundel = filter_selected_categories(filter_minimum_score_threshold(image_info_bundel, min_score_thresh), selected_categories_list)
 
 	#get frame image paths in order
 	frame_path_dict = get_frame_path_dict(video_frames_dirpath)
 
+	#
+	#	find distance between highest score player and highest score ball
+	#
+
+	#size of basketball : number of pixels
+	#NBA is 29.5 inches in circumference
+	#diameter = 29.5/(3.14) = 9.4 in
+
+	#angle from person to basketball
+
+	#person chest 3/4 height, 1/2 width
+	#get person marker
 
 	#
 	# test load and write frame
 	#
 
-	first_frame = 225
-	first_frame_path = frame_path_dict[first_frame]
-	first_frame_image_np = load_image_np(first_frame_path)
-	first_frame_image_info = image_info_bundel[first_frame_path]
+	for frame in range(225, 324):
+		#frame = 259 #225
+		frame_path = frame_path_dict[frame]
+		image_np = load_image_np(frame_path)
+		image_info = image_info_bundel[frame_path]
 
-	print(get_category_box_score_tuple_list(first_frame_image_info, 'basketball'))
+		person_box = get_high_score_box(image_info, 'person')
+		person_mark = get_person_mark(person_box)
 
-	#test draw boxes
-	first_frame_image_np = draw_all_boxes_image_np(first_frame_image_np, first_frame_image_info)
+		ball_box = get_high_score_box(image_info, 'basketball')
+		ball_mark = get_ball_mark(ball_box)
 
-	write_frame_for_accuracy_test(output_image_directory, first_frame, first_frame_image_np)
+		outside_mark = get_ball_outside_mark(person_box, ball_box)
+
+		#test draw boxes
+		#image_np = draw_all_boxes_image_np(image_np, image_info)
+
+		#test draw person mark
+		image_np = draw_circle(image_np, person_mark)
+
+		#test draw ball mark
+		image_np = draw_circle(image_np, ball_mark)
+
+		#test draw person ball connector
+		#image_np = draw_person_ball_connector(image_np, person_mark, ball_mark)
+		image_np = draw_person_ball_connector(image_np, person_mark, outside_mark)
+
+		write_frame_for_accuracy_test(output_image_directory, frame, image_np)
