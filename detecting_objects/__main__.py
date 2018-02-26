@@ -677,11 +677,42 @@ if __name__ == '__main__':
 			regression_shifted_ball_marks_x, regression_shifted_ball_marks_y = zip(*regression_shifted_ball_marks)
 			#plt.plot(regression_shifted_ball_marks_x, regression_shifted_ball_marks_y, 'r')
 			#plt.plot(regression_shifted_ball_marks_y, regression_shifted_ball_marks_x, 'r')
-			plt.plot(regression_shifted_ball_marks_y, np_frames)
-			plt.show()
-			
+			#plt.plot(regression_shifted_ball_marks_y, np_frames)
+			#plt.show()
 
 
+
+			# convert regression shifted ballmarks to original axis
+			regression_ball_marks = []
+			for frame in range(np_frames.min(), np_frames.max() +1):
+				shifted_x_ball_mark = np.polyval(p1, frame)
+				shifted_y_ball_mark = np.polyval(p2, frame)
+
+				person_mark = person_marks[frame]
+
+				old_axis_ball_mark = (ball_mark[0] + person_mark[0], ball_mark[1] + person_mark[1])
+				regression_ball_marks.append(old_axis_ball_mark)
+
+			print(regression_ball_marks)
+			print(ball_marks)
+			"""
+
+			#write to images / video
+			count = 0
+			for frame in range(min_frame, max_frame + 1):
+				frame_path = frame_path_dict[frame]
+				frame_image = cv2.imread(frame_path)	#read image
+
+				if frame == np_frames.min():
+					draw_circle(frame_image, regression_ball_marks[count], color=(0,0,255))	#mark
+					count = count +1
+
+				# write images
+				write_frame_for_accuracy_test(output_frames_directory, frame, frame_image)
+
+			# write video
+			frame_directory_to_video(output_frames_directory, output_video_file)
+			"""
 
 			#ax.scatter(np_frames, shifted_ys)
 			#plt.show()
