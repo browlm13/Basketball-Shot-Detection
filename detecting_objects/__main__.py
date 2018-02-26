@@ -184,6 +184,22 @@ def draw_person_ball_connector(image_np, person_mark, ball_mark):
 	cv2.line(image_np, person_mark, ball_mark, (255,0,0), lineThickness)
 	return image_np
 
+
+def iou(box1, box2):
+	#return "intersection over union" of two bounding boxes as float (0,1)
+	paired_boxes = tuple(zip(box1, box2))
+
+	# find intersecting box
+	intersecting_box = (max(paired_boxes[0]), min(paired_boxes[1]), max(paired_boxes[2]), min(paired_boxes[3]))
+
+	# adjust for min functions
+	if (intersecting_box[1] < intersecting_box[0]) or (intersecting_box[3] < intersecting_box[2]):
+		return 0.0
+
+	# compute the intersection over union
+	return box_area(intersecting_box)  / float( box_area(box1) + box_area(box2) - box_area(intersecting_box) )
+
+
 def load_image_np(image_path):
 	#non relitive path
 	script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -382,6 +398,15 @@ def stabalize_to_person_mark_frame(frame_image, image_info):
 	person_box = get_high_score_box(image_info, 'person', must_detect=False)
 	ball_box = get_high_score_box(image_info, 'basketball', must_detect=False)
 
+	"""
+	print("\n")
+	print("\n")
+	print(person_box)
+	print(ball_box)
+	print("\n")
+	print("\n")
+	"""
+
 	if person_box is not None:
 		#use person mark as center coordinates
 		px, py = get_person_mark(person_box)
@@ -470,10 +495,10 @@ def frame_cycle(image_info_bundel, input_frame_path_dict, output_frames_director
 					image_np = cv2.addWeighted(image_np,alpha,next_image_np,beta,gamma)
 
 			# write images
-			write_frame_for_accuracy_test(output_frames_directory, frame, image_np)
+			#write_frame_for_accuracy_test(output_frames_directory, frame, image_np)
 
 		# write video
-		frame_directory_to_video(output_frames_directory, output_video_file)
+		#frame_directory_to_video(output_frames_directory, output_video_file)
 	else:
 		logger.error("not continuous")
 
