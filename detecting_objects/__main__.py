@@ -522,25 +522,32 @@ if __name__ == '__main__':
 	for i in range(1,2):
 
 		print ("video %d" % i)
-		#video frames diretory (basketball_225.JPEG - basketball_262.JPEG)
+
+		model_collection_name = "basketball_model_v1" #"person_basketball_model_v1"
+
+		#input video frames directory paths
 		video_frames_dirpath = "/Users/ljbrown/Desktop/StatGeek/object_detection/video_frames/frames_shot_%s" % i
 
-		#output images directory for checking
-		output_frames_directory = "/Users/ljbrown/Desktop/StatGeek/object_detection/output_images/output_frames_shot_%s" % i
+		#output images and video directories for checking
+		output_frames_directory = "/Users/ljbrown/Desktop/StatGeek/object_detection/%s/output_images/output_frames_shot_%s" % (model_collection_name,i)
+		output_video_file = '%s/output_video/shot_%d_stabalized_pmark_block.mp4' % (model_collection_name,i)
 
 		#image_boolean_bundel and image_info_bundel file paths for quick access
-		image_boolean_bundel_filepath = "/Users/ljbrown/Desktop/StatGeek/object_detection/image_evaluator_output/shot_%s_image_boolean_bundel.json" % i
-		image_info_bundel_filepath = "/Users/ljbrown/Desktop/StatGeek/object_detection/image_evaluator_output/shot_%s_image_info_bundel.json" % i
+		image_boolean_bundel_filepath = "/Users/ljbrown/Desktop/StatGeek/object_detection/%s/image_evaluator_output/shot_%s_image_boolean_bundel.json" % (model_collection_name,i)
+		image_info_bundel_filepath = "/Users/ljbrown/Desktop/StatGeek/object_detection/%s/image_evaluator_output/shot_%s_image_info_bundel.json" % (model_collection_name,i)
+
+		#create dirs*** if dont exist: image_info_bundel_filepath, image_boolean_bundel_filepath,  
 
 		#tensorflow models
 		BASKETBALL_MODEL = {'name' : 'basketball_model_v1', 'use_display_name' : False, 'paths' : {'frozen graph': "image_evaluator/models/basketball_model_v1/frozen_inference_graph/frozen_inference_graph.pb", 'labels' : "image_evaluator/models/basketball_model_v1/label_map.pbtxt"}}
 		PERSON_MODEL = {'name' : 'ssd_mobilenet_v1_coco_2017_11_17', 'use_display_name' : True, 'paths' : {'frozen graph': "image_evaluator/models/ssd_mobilenet_v1_coco_2017_11_17/frozen_inference_graph/frozen_inference_graph.pb", 'labels' : "image_evaluator/models/ssd_mobilenet_v1_coco_2017_11_17/mscoco_label_map.pbtxt"}}
-
+		BASKETBALL_PERSON_MODEL = {'name' : 'person_basketball_model_v1', 'use_display_name' : False, 'paths' : {'frozen graph': "image_evaluator/models/person_basketball_model_v1/frozen_inference_graph/frozen_inference_graph.pb", 'labels' : "image_evaluator/models/person_basketball_model_v1/label_map.pbtxt"}}
 		#bool rule - any basketball or person above an accuracy score of 40.0
 		bool_rule = "any('basketball', 40.0) or any('person', 40.0)"
 
 		#save to files for quick access
 		#save_image_directory_evaluations(video_frames_dirpath, image_boolean_bundel_filepath, image_info_bundel_filepath, [BASKETBALL_MODEL, PERSON_MODEL], bool_rule)
+		#save_image_directory_evaluations(video_frames_dirpath, image_boolean_bundel_filepath, image_info_bundel_filepath, [BASKETBALL_PERSON_MODEL], bool_rule)
 
 
 		#load saved image_info_bundel
@@ -548,7 +555,7 @@ if __name__ == '__main__':
 
 		#filter selected categories and min socre
 		selected_categories_list = ['basketball', 'person']
-		min_score_thresh = 15.0
+		min_score_thresh = 10.0
 		image_info_bundel = filter_selected_categories(filter_minimum_score_threshold(image_info_bundel, min_score_thresh), selected_categories_list)
 
 		#get frame image paths in order
@@ -559,24 +566,176 @@ if __name__ == '__main__':
 		#
 		#	Call function for frame cycle
 		#
-		# frame cycle function should take frame directory and function to run on frame
-		# frame cycle should call function with arguments of frame_path, image_info_bundle
-		#how to handle globals?
 
 		input_frame_path_dict = get_frame_path_dict(video_frames_dirpath)
 		#output_video_file = 'output_video/shot_%d_pure_block_history.mp4' % i
 		#frame_cycle(image_info_bundel, input_frame_path_dict, output_frames_directory, output_video_file, pure_boundary_box_frame, apply_history=True)
+		#frame_cycle(image_info_bundel, input_frame_path_dict, output_frames_directory, output_video_file, stabalize_to_person_mark_frame)
 
-		output_video_file = 'output_video/shot_%d_stabalized_pmark_block.mp4' % i
-		frame_cycle(image_info_bundel, input_frame_path_dict, output_frames_directory, output_video_file, stabalize_to_person_mark_frame)
 
+
+		#
+		# Find ball trajectory
+		#
+		# get minimum and maximum frame indexes
+		min_frame, max_frame, continuous = min_max_frames(frame_path_dict)
+
+		# frame cycle
+		if continuous:
+		
+			#
+			#histories for ball trajectory plotting
+			#
+			person_marks = {}
+			ball_marks = {}
+
+			for frame in range(min_frame, max_frame + 1):
+				frame_path = frame_path_dict[frame]
+				image_info = image_info_bundel[frame_path]
+
+				#get person and ball boxes
+				person_box = get_high_score_box(image_info, 'person', must_detect=False)
+				ball_box = get_high_score_box(image_info, 'basketball', must_detect=False)
+
+				if person_box is not None:
+						#histories for ball trajectory plotting
+						person_marks[frame] = get_person_mark(person_box)
+
+						if ball_box is not None:
+
+							#iou overlap
+							if iou(person_box, ball_box) == 0:
+								#histories for ball trajectory plotting
+								ball_marks[frame] = get_ball_mark(ball_box)
+
+
+			"""
+				starting at first frame ball is detected
+				make create element for each possible frame from detection to end
+				fill each known gap with balls shifted coordinates
+					shifted coordinates: bx-px, by-py
+			"""
+
+			known_shifted_coordinates = []
+			frame_number = []
+
+			shifted_ball_marks = {}
+			shifted_ball_marks_x = {}
+			shifted_ball_marks_y = {}
+
+			for frame, ball_mark in ball_marks.items():
+				person_mark = person_marks[frame]
+				new_ball_mark = (ball_mark[0] - person_mark[0], ball_mark[1] - person_mark[1])
+				shifted_ball_marks[frame] = new_ball_mark
+
+				shifted_ball_marks_x[frame] = ball_mark[0] - person_mark[0]
+				shifted_ball_marks_y[frame] = person_mark[1]- ball_mark[1] #ball_mark[1] - person_mark[1]
+
+
+			frames, shifted_xs = zip(*shifted_ball_marks_x.items())
+			frames, shifted_ys = zip(*shifted_ball_marks_y.items())
+
+			print(frames)
+			print(shifted_xs)
+			print(shifted_ys)
+
+			np_frames = np.array(list(frames))
+			np_shifted_xs = np.array(list(shifted_xs))
+			np_shifted_ys = np.array(list(shifted_ys))
+
+			fig = plt.figure()
+			#ax = fig.add_subplot(1, 1, 1)
+			#ax.scatter(np_frames, shifted_xs)
+			#plt.show()
+
+			#find regression line for x versus frames
+			#from scipy import stats
+			#slope, intercept, r_value, p_value, std_err = stats.linregress(np_frames, shifted_xs)
+			#print("slope: %f" % slope)
+			#print("intercept: %f" % intercept)
+			#print("r_value: %f" % r_value)
+
+			#xs - degreen 1 regression fit
+			p1 = np.polyfit(np_frames, shifted_xs, 1)
+			#plt.plot(np_frames, np.polyval(p1,np_frames))
+
+			#ys - degree 2 regression fit
+			p2 = np.polyfit(np_frames, shifted_ys, 2)
+			#plt.plot(np_frames, np.polyval(p2,np_frames), 'r-')
+			#plt.show()
+
+
+			# use new regression fit formulas to find actual values at x
+
+			regression_shifted_ball_marks = []
+
+			for frame in range(np_frames.min(), np_frames.max() +1):
+				shifted_x_ball_mark = np.polyval(p1, frame)
+				shifted_y_ball_mark = np.polyval(p2, frame)
+				regression_shifted_ball_marks.append((shifted_x_ball_mark,shifted_y_ball_mark))
+
+			regression_shifted_ball_marks_x, regression_shifted_ball_marks_y = zip(*regression_shifted_ball_marks)
+			#plt.plot(regression_shifted_ball_marks_x, regression_shifted_ball_marks_y, 'r')
+			#plt.plot(regression_shifted_ball_marks_y, regression_shifted_ball_marks_x, 'r')
+			plt.plot(regression_shifted_ball_marks_y, np_frames)
+			plt.show()
+			
+
+
+
+			#ax.scatter(np_frames, shifted_ys)
+			#plt.show()
+
+			#find regression line for x versus frames
+			#from scipy import stats
+			#slope, intercept, r_value, p_value, std_err = stats.linregress(np_frames, shifted_xs)
+			#print("slope: %f" % slope)
+			#print("intercept: %f" % intercept)
+			#print("r_value: %f" % r_value)
+
+
+			#not quite the mean
+			#print(np.mean(np_shifted_xs))
+
+			#find the mean
+			#frame_difrence = np.maximum(np_frames) - np.minimum(np_frames)
+
+
+
+
+			"""
+			for frame in range(min_frame, max_frame + 1):
+				if frame in ball_marks:
+					frame_number.append()
+			"""
+
+	
+
+
+		"""
+			-ball should move equal amounts horizontally each frame after shot
+			-matrix of ball mark center points -> evenly space points off of mean seperation for path estimation
+			-you can aply gravitys pull and calculate the mean seperation for veriticle points also
+			-try applying these rules to centering around person mark vs original
+
+			1. find array of person marks
+			2. find array of ball marks
+			3. calculate distance to ball where person is origin array of ball marks (shifted ball marks)
+			4. plot
+			5. find mean x seperation of shifted ball marks
+			6. linspace x ball marks according to that
+
+			gravity correction
+			(assume like 24 frames a second)
+			it will be a parabola that explains the speed or distnace downward or upward
+		"""
 		"""
 		#plt.imshow(rgb_blank_image)
 		#plt.show()
 
 		#
 		# test load and write frame
-		#
+		
 
 		ball_marks = []
 		ball_radii = []
