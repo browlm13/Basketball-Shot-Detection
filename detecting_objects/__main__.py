@@ -63,9 +63,9 @@ def write_frame_for_accuracy_test(output_directory_path, frame, image_np):
 
 
 #list of 4 coordanates for box
-def draw_box_image_np(image_np, box):
+def draw_box_image_np(image_np, box, color=(0,255,0)):
 	(left, right, top, bottom) = box
-	cv2.rectangle(image_np,(left,top),(right,bottom),(0,255,0),3)
+	cv2.rectangle(image_np,(left,top),(right,bottom),color,3)
 	return image_np
 
 def draw_all_boxes_image_np(image_np, image_info):
@@ -179,9 +179,9 @@ def draw_circle(image_np, center, radius=2, color=(0,0,255), thickness=10, lineT
 	cv2.circle(image_np, center, radius, color, thickness=thickness, lineType=lineType, shift=shift)
 	return image_np
 
-def draw_person_ball_connector(image_np, person_mark, ball_mark):
+def draw_person_ball_connector(image_np, person_mark, ball_mark, color=(255,0,0)):
 	lineThickness = 7
-	cv2.line(image_np, person_mark, ball_mark, (255,0,0), lineThickness)
+	cv2.line(image_np, person_mark, ball_mark, color, lineThickness)
 	return image_np
 
 
@@ -398,15 +398,6 @@ def stabalize_to_person_mark_frame(frame_image, image_info):
 	person_box = get_high_score_box(image_info, 'person', must_detect=False)
 	ball_box = get_high_score_box(image_info, 'basketball', must_detect=False)
 
-	"""
-	print("\n")
-	print("\n")
-	print(person_box)
-	print(ball_box)
-	print("\n")
-	print("\n")
-	"""
-
 	if person_box is not None:
 		#use person mark as center coordinates
 		px, py = get_person_mark(person_box)
@@ -425,12 +416,7 @@ def stabalize_to_person_mark_frame(frame_image, image_info):
 		new_person_bottom = center[1] + int(person_height * (3/4))
 
 		new_person_box = (new_person_left, new_person_right, new_person_top,new_person_bottom)
-		draw_circle(rgb_blank_image, center)
-		draw_box_image_np(rgb_blank_image, new_person_box)
 
-		#old marks
-		draw_box_image_np(rgb_blank_image, person_box)
-		draw_circle(rgb_blank_image, (px, py))
 
 		if ball_box is not None:
 
@@ -446,19 +432,43 @@ def stabalize_to_person_mark_frame(frame_image, image_info):
 
 			ball_radius = get_ball_radius(ball_box)
 
-			draw_circle(rgb_blank_image, new_ball_mark)
-			draw_circle(rgb_blank_image, new_ball_mark, radius=ball_radius)
+			#draw_circle(rgb_blank_image, new_ball_mark)
+			#draw_circle(rgb_blank_image, new_ball_mark, radius=ball_radius)
 
-			#old marks
-			draw_box_image_np(rgb_blank_image, ball_box)
-			draw_circle(rgb_blank_image, (bx, by))
-
-
-			#draw connectors
-			draw_person_ball_connector(rgb_blank_image, center, new_ball_mark) # new
-			draw_person_ball_connector(rgb_blank_image, (px,py), (bx,by)) # old
+			#old  drawing
+			draw_box_image_np(rgb_blank_image, person_box)
+			draw_circle(rgb_blank_image, (px, py))
+			draw_box_image_np(rgb_blank_image, ball_box) #ball box
+			draw_circle(rgb_blank_image, (bx, by))	#ball circle
+			draw_person_ball_connector(rgb_blank_image, (px,py), (bx,by)) #draw connectors
 
 
+			#iou overlap
+			if iou(person_box, ball_box) > 0:
+
+				#new coordinate drawings
+
+				#ball
+				draw_circle(rgb_blank_image, new_ball_mark, color=(0,255,0))	#mark
+				draw_circle(rgb_blank_image, new_ball_mark, radius=ball_radius, color=(0,255,0), thickness=5) #draw ball
+				draw_person_ball_connector(rgb_blank_image, center, new_ball_mark, color=(0,255,0)) # connector
+
+				#person
+				draw_circle(rgb_blank_image, center, color=(0,255,0))
+				draw_box_image_np(rgb_blank_image, new_person_box, color=(0,255,0))
+
+			else:
+
+				#new coordinate drawings
+
+				#ball
+				draw_circle(rgb_blank_image, new_ball_mark, color=(0,0,255))	#mark
+				draw_circle(rgb_blank_image, new_ball_mark, radius=ball_radius, color=(0,0,255)) #ball
+				draw_person_ball_connector(rgb_blank_image, center, new_ball_mark, color=(0,0,255)) #connector
+
+				#person
+				draw_circle(rgb_blank_image, center, color=(0,0,255))
+				draw_box_image_np(rgb_blank_image, new_person_box, color=(0,0,255))
 
 	return rgb_blank_image
 
@@ -495,10 +505,10 @@ def frame_cycle(image_info_bundel, input_frame_path_dict, output_frames_director
 					image_np = cv2.addWeighted(image_np,alpha,next_image_np,beta,gamma)
 
 			# write images
-			#write_frame_for_accuracy_test(output_frames_directory, frame, image_np)
+			write_frame_for_accuracy_test(output_frames_directory, frame, image_np)
 
 		# write video
-		#frame_directory_to_video(output_frames_directory, output_video_file)
+		frame_directory_to_video(output_frames_directory, output_video_file)
 	else:
 		logger.error("not continuous")
 
