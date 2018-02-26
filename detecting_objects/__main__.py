@@ -519,7 +519,7 @@ if __name__ == '__main__':
 	# Initial Evaluation
 	#
 
-	for i in range(1,2):
+	for i in range(1,18):
 
 		print ("video %d" % i)
 
@@ -530,7 +530,7 @@ if __name__ == '__main__':
 
 		#output images and video directories for checking
 		output_frames_directory = "/Users/ljbrown/Desktop/StatGeek/object_detection/%s/output_images/output_frames_shot_%s" % (model_collection_name,i)
-		output_video_file = '%s/output_video/shot_%d_stabalized_pmark_block.mp4' % (model_collection_name,i)
+		output_video_file = '%s/output_video/shot_%d_prediction_trajectory.mp4' % (model_collection_name,i)
 
 		#image_boolean_bundel and image_info_bundel file paths for quick access
 		image_boolean_bundel_filepath = "/Users/ljbrown/Desktop/StatGeek/object_detection/%s/image_evaluator_output/shot_%s_image_boolean_bundel.json" % (model_collection_name,i)
@@ -589,6 +589,7 @@ if __name__ == '__main__':
 			person_marks = {}
 			ball_marks = {}
 
+			stop_collecting = False
 			for frame in range(min_frame, max_frame + 1):
 				frame_path = frame_path_dict[frame]
 				image_info = image_info_bundel[frame_path]
@@ -598,15 +599,24 @@ if __name__ == '__main__':
 				ball_box = get_high_score_box(image_info, 'basketball', must_detect=False)
 
 				if person_box is not None:
-						#histories for ball trajectory plotting
-						person_marks[frame] = get_person_mark(person_box)
+
+						if not stop_collecting:
+							#histories for ball trajectory plotting
+							person_marks[frame] = get_person_mark(person_box)
 
 						if ball_box is not None:
 
 							#iou overlap
-							if iou(person_box, ball_box) == 0:
+							if (iou(person_box, ball_box) == 0) and (not stop_collecting):
 								#histories for ball trajectory plotting
 								ball_marks[frame] = get_ball_mark(ball_box)
+								print(frame)
+
+							#break on rejoin
+							if (iou(person_box, ball_box) > 0) and (bool(ball_marks)):
+								stop_collecting = True
+			
+
 
 
 			"""
@@ -636,9 +646,9 @@ if __name__ == '__main__':
 			frames, shifted_xs = zip(*shifted_ball_marks_x.items())
 			frames, shifted_ys = zip(*shifted_ball_marks_y.items())
 
-			print(frames)
-			print(shifted_xs)
-			print(shifted_ys)
+			#print(frames)
+			#print(shifted_xs)
+			#print(shifted_ys)
 
 			np_frames = np.array(list(frames))
 			np_shifted_xs = np.array(list(shifted_xs))
@@ -715,33 +725,46 @@ if __name__ == '__main__':
 			frame_directory_to_video(output_frames_directory, output_video_file)
 
 			"""
+			#only collect for acceptable range
+
 			regression_ball_marks = []
+			prev_person_mark = person_marks[np_frames.min()]
 			for frame in range(np_frames.min(), np_frames.max() +1):
 				shifted_x_ball_mark = np.polyval(p1, frame)
 				shifted_y_ball_mark = np.polyval(p2, frame)
 
 				person_mark = person_marks[frame]
 
-				#old_axis_ball_mark = (shifted_x_ball_mark + person_mark[0], person_mark[1] + shifted_y_ball_mark)
-				old_axis_ball_mark = (int(shifted_x_ball_mark + person_mark[0]), int(shifted_y_ball_mark + person_mark[1]))
-				regression_ball_marks.append(old_axis_ball_mark)
+				if (person_mark is not None):
+					#old_axis_ball_mark = (shifted_x_ball_mark + person_mark[0], person_mark[1] + shifted_y_ball_mark)
+					old_axis_ball_mark = (int(shifted_x_ball_mark + person_mark[0]), int(shifted_y_ball_mark + person_mark[1]))
+					regression_ball_marks.append(old_axis_ball_mark)
 
-			print(regression_ball_marks)
-			print(ball_marks)
+					prev_person_mark = person_mark
+				else:
+					old_axis_ball_mark = (int(shifted_x_ball_mark + prev_person_mark[0]), int(shifted_y_ball_mark + prev_person_mark[1]))
+					regression_ball_marks.append(old_axis_ball_mark)
+
+			#print(regression_ball_marks)
+			#print(ball_marks)
 
 
 			#write to images / video
 			count = 0
 			for frame in range(min_frame, max_frame + 1):
-				frame_path = frame_path_dict[frame]
-				frame_image = cv2.imread(frame_path)	#read image
 
-				if frame >= np_frames.min():
-					draw_circle(frame_image, regression_ball_marks[count], color=(0,0,255))	#mark
-					count = count +1
+				try: 
+					frame_path = frame_path_dict[frame]
+					frame_image = cv2.imread(frame_path)	#read image
 
-				# write images
-				write_frame_for_accuracy_test(output_frames_directory, frame, frame_image)
+					if (frame >= np_frames.min()) and (frame <= np_frames.max()): #<
+						draw_circle(frame_image, regression_ball_marks[count], color=(0,0,255))	#mark
+						count = count +1
+
+					# write images
+					write_frame_for_accuracy_test(output_frames_directory, frame, frame_image)
+
+				except: pass
 
 			# write video
 			frame_directory_to_video(output_frames_directory, output_video_file)
