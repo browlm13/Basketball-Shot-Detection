@@ -629,7 +629,8 @@ if __name__ == '__main__':
 				shifted_ball_marks[frame] = new_ball_mark
 
 				shifted_ball_marks_x[frame] = ball_mark[0] - person_mark[0]
-				shifted_ball_marks_y[frame] = person_mark[1]- ball_mark[1] #ball_mark[1] - person_mark[1]
+				#shifted_ball_marks_y[frame] = person_mark[1]- ball_mark[1] #ball_mark[1] - person_mark[1]
+				shifted_ball_marks_y[frame] = ball_mark[1] - person_mark[1]
 
 
 			frames, shifted_xs = zip(*shifted_ball_marks_x.items())
@@ -681,8 +682,39 @@ if __name__ == '__main__':
 			#plt.show()
 
 
-
+			"""
 			# convert regression shifted ballmarks to original axis
+			regression_ball_marks = {}
+			for frame in range(np_frames.min(), np_frames.max() +1):
+				shifted_x_ball_mark = np.polyval(p1, frame)
+				shifted_y_ball_mark = np.polyval(p2, frame)
+
+				person_mark = person_marks[frame]
+
+				#old_axis_ball_mark = (shifted_x_ball_mark + person_mark[0], person_mark[1] + shifted_y_ball_mark)
+				old_axis_ball_mark = (int(shifted_x_ball_mark + person_mark[0]), int(shifted_y_ball_mark + person_mark[1]))
+				regression_ball_marks[frame] = old_axis_ball_mark
+
+			print(regression_ball_marks)
+			print(ball_marks)
+
+
+
+			#write to images / video
+			for frame in range(min_frame, max_frame + 1):
+				frame_path = frame_path_dict[frame]
+				frame_image = cv2.imread(frame_path)	#read image
+
+				if frame == np_frames.min():
+					draw_circle(frame_image, regression_ball_marks[frame], color=(0,0,255))	#mark
+
+				# write images
+				write_frame_for_accuracy_test(output_frames_directory, frame, frame_image)
+
+			# write video
+			frame_directory_to_video(output_frames_directory, output_video_file)
+
+			"""
 			regression_ball_marks = []
 			for frame in range(np_frames.min(), np_frames.max() +1):
 				shifted_x_ball_mark = np.polyval(p1, frame)
@@ -690,12 +722,13 @@ if __name__ == '__main__':
 
 				person_mark = person_marks[frame]
 
-				old_axis_ball_mark = (ball_mark[0] + person_mark[0], ball_mark[1] + person_mark[1])
+				#old_axis_ball_mark = (shifted_x_ball_mark + person_mark[0], person_mark[1] + shifted_y_ball_mark)
+				old_axis_ball_mark = (int(shifted_x_ball_mark + person_mark[0]), int(shifted_y_ball_mark + person_mark[1]))
 				regression_ball_marks.append(old_axis_ball_mark)
 
 			print(regression_ball_marks)
 			print(ball_marks)
-			"""
+
 
 			#write to images / video
 			count = 0
@@ -703,7 +736,7 @@ if __name__ == '__main__':
 				frame_path = frame_path_dict[frame]
 				frame_image = cv2.imread(frame_path)	#read image
 
-				if frame == np_frames.min():
+				if frame >= np_frames.min():
 					draw_circle(frame_image, regression_ball_marks[count], color=(0,0,255))	#mark
 					count = count +1
 
@@ -712,6 +745,7 @@ if __name__ == '__main__':
 
 			# write video
 			frame_directory_to_video(output_frames_directory, output_video_file)
+
 			"""
 
 			#ax.scatter(np_frames, shifted_ys)
@@ -730,7 +764,7 @@ if __name__ == '__main__':
 
 			#find the mean
 			#frame_difrence = np.maximum(np_frames) - np.minimum(np_frames)
-
+			"""
 
 
 
