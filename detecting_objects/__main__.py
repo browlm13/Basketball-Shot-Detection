@@ -18,6 +18,7 @@ from matplotlib import pyplot as plt
 
 # my lib
 #from image_evaluator.src import image_evaluator
+from utils import snake_coordinates
 
 # logging
 logging.basicConfig(level=logging.INFO)
@@ -513,13 +514,28 @@ def frame_cycle(image_info_bundel, input_frame_path_dict, output_frames_director
 		logger.error("not continuous")
 
 
+#arc length parametrization of the Archimedean spiral
+#polar formula for the Archimedean spiral: r=a+bθ.
+# constant b and a value
+#Archimedean Spiral length to x,y
+#	l = sqrt(x^2 + y^2)/b
+#def archimedean_spiral_length_to_cartesian(length):
+
+#arc length is 
+#Archimedean Spiral length to x,y
+#	x = b*t*cos(l)
+#	y = b*t*sin(l)
+#def archimedean_spiral_length_to_cartesian(length):
+
+
+
 if __name__ == '__main__':
 
 	#
 	# Initial Evaluation
 	#
 
-	for i in range(1,18):
+	for i in range(2,3):
 
 		print ("video %d" % i)
 
@@ -575,13 +591,118 @@ if __name__ == '__main__':
 
 
 		#
-		# Find ball trajectory
+		# 	Extract Ball Trajectory Formula
 		#
+
+
+		#
+		#	Mock 1: Assertions: Stable video, 1 person, 1 ball
+		#
+
+		#	step 1: create matrix of colums: column 1 = ball marks ((x,y) or -1 (non)), column 2 = iou (-1,0,1) 
+		#			 take frame from video with single ball single person. Return (-1,0,1) for iou not avaiable, 0, >0
+
+		# create matrix for ball_marks and iou - collected_trajectory_matrix
+
+		# get minimum and maximum frame indexes
+		min_frame, max_frame, continuous = min_max_frames(frame_path_dict)
+
+		enum = {
+			'no data' : -1,
+			'ball without person' : 1,
+			'ball with person' : 0
+		}
+
+		# create np.matrix filled with -1's: shape 2 columns, numeber of frames in video (rather: max-min)
+		num_rows = max_frame - min_frame
+		num_cols = 2
+		collected_trajectory_matrix = np.full((num_rows, num_cols), enum['no data'])
+
+		# iou boolean lambda function for column two
+		iou_bool = lambda person_box, ball_box : enum['ball with person'] if (iou(person_box, ball_box) > 0) else enum['ball without person']
+
+		# fill matrix
+		assert continuous
+
+		for frame in range(min_frame, max_frame + 1):
+			frame_path = input_frame_path_dict[frame]
+			frame_info = image_info_bundel[frame_path]
+
+			#get frame ball box and frame person box
+			frame_ball_box = get_high_score_box(frame_info, 'basketball', must_detect=False)
+			frame_person_box = get_high_score_box(frame_info, 'person', must_detect=False)
+
+			#iou bool column two
+			if (frame_ball_box is not None) and (frame_person_box is not None):
+				collected_trajectory_matrix[frame,1] = iou_bool(frame_person_box, frame_ball_box)
+
+			#snake coordinates ball mark column 1
+			if (frame_ball_box is not None):
+				frame_ball_mark = get_ball_mark(frame_ball_box)
+				frame_ball_mark_snake_coordinate = snake_coordinates.to_snake_head(frame_ball_mark)
+				collected_trajectory_matrix[frame,0] = frame_ball_mark_snake_coordinate
+
+		
+		# identify likley tranjectory frame ranges and then refine for [ min r value ]
+		#		1. min and max of frame range adjustment 			# for [ min r value ]
+		#		2. matrix transformation diffrent axis  			# for [ min r value ]
+
+		# first guess iteration of trajectory ranges - let o's (ball with person) act as seperators, ignore missing values -1's (no data)
+		possible_trajectory_frame_ranges = []
+		buffer_trajectory_frame_range = [-1,-1]
+		for frame, frame_iou_bool in enumerate(collected_trajectory_matrix[:,1]):
+
+			if (frame_iou_bool == 0) and (buffer_trajectory_frame_range[0] != -1):
+				print("cap")
+				buffer_trajectory_frame_range[1] = frame -1
+				possible_trajectory_frame_ranges.append(buffer_trajectory_frame_range)
+				buffer_trajectory_frame_range = [-1,-1]
+
+			if (frame_iou_bool == 1) and (buffer_trajectory_frame_range[0] == -1):
+				buffer_trajectory_frame_range[0] = frame
+
+			if (frame_iou_bool == -1) and (buffer_trajectory_frame_range[0] == -1):
+				buffer_trajectory_frame_range[0] = frame
+
+			if frame == max_frame-1:
+				buffer_trajectory_frame_range[1] = frame -1
+				possible_trajectory_frame_ranges.append(buffer_trajectory_frame_range)
+
+		print(collected_trajectory_matrix)
+		print(possible_trajectory_frame_ranges)
+
+
+
+
+		# step 1:
+		#			-identify frame ranges where likley trajectories are occuring: [(trajectory_1_start_frame, trajectory_1_end_frame), ...]
+		#				possible items of focus: frame, person_mark, ball_mark, iou for each frame
+		
+		# step 2: 
+		#			-calculate regression trajectory formula for person marks around known data points
+		#
+
+		# step 3: 
+		#			-shift ball marks acording to person regression trajectory formula
+		#
+
+		# step 4: 
+		#			-calculate regression trajectory formula for shifted ball marks around known data points
+		#
+
+		"""
+
+				methods:
+							-extract person and ball marks and iou values for each frame with values present
+								-
+		"""
+
+
 		# get minimum and maximum frame indexes
 		min_frame, max_frame, continuous = min_max_frames(frame_path_dict)
 
 		# frame cycle
-		if continuous:
+		if False: #continuous:
 		
 			#
 			#histories for ball trajectory plotting
@@ -617,158 +738,160 @@ if __name__ == '__main__':
 								stop_collecting = True
 			
 
+			try:
 
 
-			"""
-				starting at first frame ball is detected
-				make create element for each possible frame from detection to end
-				fill each known gap with balls shifted coordinates
-					shifted coordinates: bx-px, by-py
-			"""
+				"""
+					starting at first frame ball is detected
+					make create element for each possible frame from detection to end
+					fill each known gap with balls shifted coordinates
+						shifted coordinates: bx-px, by-py
+				"""
 
-			known_shifted_coordinates = []
-			frame_number = []
+				known_shifted_coordinates = []
+				frame_number = []
 
-			shifted_ball_marks = {}
-			shifted_ball_marks_x = {}
-			shifted_ball_marks_y = {}
+				shifted_ball_marks = {}
+				shifted_ball_marks_x = {}
+				shifted_ball_marks_y = {}
 
-			for frame, ball_mark in ball_marks.items():
-				person_mark = person_marks[frame]
-				new_ball_mark = (ball_mark[0] - person_mark[0], ball_mark[1] - person_mark[1])
-				shifted_ball_marks[frame] = new_ball_mark
+				for frame, ball_mark in ball_marks.items():
+					person_mark = person_marks[frame]
+					new_ball_mark = (ball_mark[0] - person_mark[0], ball_mark[1] - person_mark[1])
+					shifted_ball_marks[frame] = new_ball_mark
 
-				shifted_ball_marks_x[frame] = ball_mark[0] - person_mark[0]
-				#shifted_ball_marks_y[frame] = person_mark[1]- ball_mark[1] #ball_mark[1] - person_mark[1]
-				shifted_ball_marks_y[frame] = ball_mark[1] - person_mark[1]
-
-
-			frames, shifted_xs = zip(*shifted_ball_marks_x.items())
-			frames, shifted_ys = zip(*shifted_ball_marks_y.items())
-
-			#print(frames)
-			#print(shifted_xs)
-			#print(shifted_ys)
-
-			np_frames = np.array(list(frames))
-			np_shifted_xs = np.array(list(shifted_xs))
-			np_shifted_ys = np.array(list(shifted_ys))
-
-			fig = plt.figure()
-			#ax = fig.add_subplot(1, 1, 1)
-			#ax.scatter(np_frames, shifted_xs)
-			#plt.show()
-
-			#find regression line for x versus frames
-			#from scipy import stats
-			#slope, intercept, r_value, p_value, std_err = stats.linregress(np_frames, shifted_xs)
-			#print("slope: %f" % slope)
-			#print("intercept: %f" % intercept)
-			#print("r_value: %f" % r_value)
-
-			#xs - degreen 1 regression fit
-			p1 = np.polyfit(np_frames, shifted_xs, 1)
-			#plt.plot(np_frames, np.polyval(p1,np_frames))
-
-			#ys - degree 2 regression fit
-			p2 = np.polyfit(np_frames, shifted_ys, 2)
-			#plt.plot(np_frames, np.polyval(p2,np_frames), 'r-')
-			#plt.show()
+					shifted_ball_marks_x[frame] = ball_mark[0] - person_mark[0]
+					#shifted_ball_marks_y[frame] = person_mark[1]- ball_mark[1] #ball_mark[1] - person_mark[1]
+					shifted_ball_marks_y[frame] = ball_mark[1] - person_mark[1]
 
 
-			# use new regression fit formulas to find actual values at x
+				frames, shifted_xs = zip(*shifted_ball_marks_x.items())
+				frames, shifted_ys = zip(*shifted_ball_marks_y.items())
 
-			regression_shifted_ball_marks = []
+				#print(frames)
+				#print(shifted_xs)
+				#print(shifted_ys)
 
-			for frame in range(np_frames.min(), np_frames.max() +1):
-				shifted_x_ball_mark = np.polyval(p1, frame)
-				shifted_y_ball_mark = np.polyval(p2, frame)
-				regression_shifted_ball_marks.append((shifted_x_ball_mark,shifted_y_ball_mark))
+				np_frames = np.array(list(frames))
+				np_shifted_xs = np.array(list(shifted_xs))
+				np_shifted_ys = np.array(list(shifted_ys))
 
-			regression_shifted_ball_marks_x, regression_shifted_ball_marks_y = zip(*regression_shifted_ball_marks)
-			#plt.plot(regression_shifted_ball_marks_x, regression_shifted_ball_marks_y, 'r')
-			#plt.plot(regression_shifted_ball_marks_y, regression_shifted_ball_marks_x, 'r')
-			#plt.plot(regression_shifted_ball_marks_y, np_frames)
-			#plt.show()
+				fig = plt.figure()
+				#ax = fig.add_subplot(1, 1, 1)
+				#ax.scatter(np_frames, shifted_xs)
+				#plt.show()
 
+				#find regression line for x versus frames
+				#from scipy import stats
+				#slope, intercept, r_value, p_value, std_err = stats.linregress(np_frames, shifted_xs)
+				#print("slope: %f" % slope)
+				#print("intercept: %f" % intercept)
+				#print("r_value: %f" % r_value)
 
-			"""
-			# convert regression shifted ballmarks to original axis
-			regression_ball_marks = {}
-			for frame in range(np_frames.min(), np_frames.max() +1):
-				shifted_x_ball_mark = np.polyval(p1, frame)
-				shifted_y_ball_mark = np.polyval(p2, frame)
+				#xs - degreen 1 regression fit
+				p1 = np.polyfit(np_frames, shifted_xs, 1)
+				#plt.plot(np_frames, np.polyval(p1,np_frames))
 
-				person_mark = person_marks[frame]
-
-				#old_axis_ball_mark = (shifted_x_ball_mark + person_mark[0], person_mark[1] + shifted_y_ball_mark)
-				old_axis_ball_mark = (int(shifted_x_ball_mark + person_mark[0]), int(shifted_y_ball_mark + person_mark[1]))
-				regression_ball_marks[frame] = old_axis_ball_mark
-
-			print(regression_ball_marks)
-			print(ball_marks)
-
+				#ys - degree 2 regression fit
+				p2 = np.polyfit(np_frames, shifted_ys, 2)
+				#plt.plot(np_frames, np.polyval(p2,np_frames), 'r-')
+				#plt.show()
 
 
-			#write to images / video
-			for frame in range(min_frame, max_frame + 1):
-				frame_path = frame_path_dict[frame]
-				frame_image = cv2.imread(frame_path)	#read image
+				# use new regression fit formulas to find actual values at x
 
-				if frame == np_frames.min():
-					draw_circle(frame_image, regression_ball_marks[frame], color=(0,0,255))	#mark
+				regression_shifted_ball_marks = []
 
-				# write images
-				write_frame_for_accuracy_test(output_frames_directory, frame, frame_image)
+				for frame in range(np_frames.min(), np_frames.max() +1):
+					shifted_x_ball_mark = np.polyval(p1, frame)
+					shifted_y_ball_mark = np.polyval(p2, frame)
+					regression_shifted_ball_marks.append((shifted_x_ball_mark,shifted_y_ball_mark))
 
-			# write video
-			frame_directory_to_video(output_frames_directory, output_video_file)
+				regression_shifted_ball_marks_x, regression_shifted_ball_marks_y = zip(*regression_shifted_ball_marks)
+				#plt.plot(regression_shifted_ball_marks_x, regression_shifted_ball_marks_y, 'r')
+				#plt.plot(regression_shifted_ball_marks_y, regression_shifted_ball_marks_x, 'r')
+				#plt.plot(regression_shifted_ball_marks_y, np_frames)
+				#plt.show()
 
-			"""
-			#only collect for acceptable range
 
-			regression_ball_marks = []
-			prev_person_mark = person_marks[np_frames.min()]
-			for frame in range(np_frames.min(), np_frames.max() +1):
-				shifted_x_ball_mark = np.polyval(p1, frame)
-				shifted_y_ball_mark = np.polyval(p2, frame)
+				"""
+				# convert regression shifted ballmarks to original axis
+				regression_ball_marks = {}
+				for frame in range(np_frames.min(), np_frames.max() +1):
+					shifted_x_ball_mark = np.polyval(p1, frame)
+					shifted_y_ball_mark = np.polyval(p2, frame)
 
-				person_mark = person_marks[frame]
+					person_mark = person_marks[frame]
 
-				if (person_mark is not None):
 					#old_axis_ball_mark = (shifted_x_ball_mark + person_mark[0], person_mark[1] + shifted_y_ball_mark)
 					old_axis_ball_mark = (int(shifted_x_ball_mark + person_mark[0]), int(shifted_y_ball_mark + person_mark[1]))
-					regression_ball_marks.append(old_axis_ball_mark)
+					regression_ball_marks[frame] = old_axis_ball_mark
 
-					prev_person_mark = person_mark
-				else:
-					old_axis_ball_mark = (int(shifted_x_ball_mark + prev_person_mark[0]), int(shifted_y_ball_mark + prev_person_mark[1]))
-					regression_ball_marks.append(old_axis_ball_mark)
-
-			#print(regression_ball_marks)
-			#print(ball_marks)
+				print(regression_ball_marks)
+				print(ball_marks)
 
 
-			#write to images / video
-			count = 0
-			for frame in range(min_frame, max_frame + 1):
 
-				try: 
+				#write to images / video
+				for frame in range(min_frame, max_frame + 1):
 					frame_path = frame_path_dict[frame]
 					frame_image = cv2.imread(frame_path)	#read image
 
-					if (frame >= np_frames.min()) and (frame <= np_frames.max()): #<
-						draw_circle(frame_image, regression_ball_marks[count], color=(0,0,255))	#mark
-						count = count +1
+					if frame == np_frames.min():
+						draw_circle(frame_image, regression_ball_marks[frame], color=(0,0,255))	#mark
 
 					# write images
 					write_frame_for_accuracy_test(output_frames_directory, frame, frame_image)
 
-				except: pass
+				# write video
+				frame_directory_to_video(output_frames_directory, output_video_file)
 
-			# write video
-			frame_directory_to_video(output_frames_directory, output_video_file)
+				"""
+				#only collect for acceptable range
 
+				regression_ball_marks = []
+				prev_person_mark = person_marks[np_frames.min()]
+				for frame in range(np_frames.min(), np_frames.max() +1):
+					shifted_x_ball_mark = np.polyval(p1, frame)
+					shifted_y_ball_mark = np.polyval(p2, frame)
+
+					person_mark = person_marks[frame]
+
+					if (person_mark is not None):
+						#old_axis_ball_mark = (shifted_x_ball_mark + person_mark[0], person_mark[1] + shifted_y_ball_mark)
+						old_axis_ball_mark = (int(shifted_x_ball_mark + person_mark[0]), int(shifted_y_ball_mark + person_mark[1]))
+						regression_ball_marks.append(old_axis_ball_mark)
+
+						prev_person_mark = person_mark
+					else:
+						old_axis_ball_mark = (int(shifted_x_ball_mark + prev_person_mark[0]), int(shifted_y_ball_mark + prev_person_mark[1]))
+						regression_ball_marks.append(old_axis_ball_mark)
+
+				#print(regression_ball_marks)
+				#print(ball_marks)
+
+
+				#write to images / video
+				count = 0
+				for frame in range(min_frame, max_frame + 1):
+
+					try: 
+						frame_path = frame_path_dict[frame]
+						frame_image = cv2.imread(frame_path)	#read image
+
+						if (frame >= np_frames.min()) and (frame <= np_frames.max()): #<
+							draw_circle(frame_image, regression_ball_marks[count], color=(0,0,255))	#mark
+							count = count +1
+
+						# write images
+						write_frame_for_accuracy_test(output_frames_directory, frame, frame_image)
+
+					except: pass
+
+				# write video
+				frame_directory_to_video(output_frames_directory, output_video_file)
+
+			except: pass
 			"""
 
 			#ax.scatter(np_frames, shifted_ys)
@@ -790,13 +913,6 @@ if __name__ == '__main__':
 			"""
 
 
-
-			"""
-			for frame in range(min_frame, max_frame + 1):
-				if frame in ball_marks:
-					frame_number.append()
-			"""
-
 	
 
 
@@ -817,92 +933,6 @@ if __name__ == '__main__':
 			(assume like 24 frames a second)
 			it will be a parabola that explains the speed or distnace downward or upward
 		"""
-		"""
-		#plt.imshow(rgb_blank_image)
-		#plt.show()
-
-		#
-		# test load and write frame
-		
-
-		ball_marks = []
-		ball_radii = []
-		person_marks = []
-
-		# stats
-		person_boxes = []
-		ball_boxes = []
-
-		# get frames range
-		min_frame = 1
-		max_frame = 1
-		for key in frame_path_dict:
-			if key > max_frame:
-				max_frame = key
-
-		
-		for frame in range(min_frame, max_frame + 1):
-
-			print("\tframe %d" % frame)
-			#frame = 259 #225
-			frame_path = frame_path_dict[frame]
-			image_np = load_image_np(frame_path)
-			image_info = image_info_bundel[frame_path]
-
-			try:
-
-				person_box = get_high_score_box(image_info, 'person')
-				person_mark = get_person_mark(person_box)
-
-				ball_box = get_high_score_box(image_info, 'basketball')
-				ball_mark = get_ball_mark(ball_box)
-				ball_radius = get_ball_radius(ball_box)
-
-				#get person and box histories
-				person_boxes.append(person_box)
-				ball_boxes.append(ball_box)
-
-				#add to history - todo: get all from person and box history
-				person_marks.append(person_mark)
-				ball_marks.append(ball_mark)
-				ball_radii.append(ball_radius)
-
-				outside_mark = get_ball_outside_mark(person_box, ball_box)
-
-				#test draw boxes
-				#image_np = draw_all_boxes_image_np(image_np, image_info)
-				#test draw basketball outline
-				image_np = draw_circle(image_np, ball_mark, radius=ball_radius, color=(0,255,0), thickness=2)
-
-				
-				#draw history with decreasing brighness
-				#for l in range(len(ball_marks)):
-
-				#	for j in range(l-1):
-				#		k = j+1
-				#		draw_person_ball_connector(image_np, ball_marks[j], ball_marks[k])
-
-				#	image_np = draw_circle(image_np, ball_marks[l], color=(200,200,255))
-				#	#image_np = draw_circle(image_np, person_marks[l], color=(200,200,255))
-
-				#	#image_np = draw_circle(image_np, ball_marks[l], radius=ball_radii[l], color=(0,100,0), thickness=2)
-
-				#test draw person mark
-				image_np = draw_circle(image_np, person_mark)
-
-				#test draw ball mark
-				image_np = draw_circle(image_np, ball_mark)
-
-				#test draw person ball connector
-				#image_np = draw_person_ball_connector(image_np, person_mark, ball_mark)
-				image_np = draw_person_ball_connector(image_np, person_mark, outside_mark)
-
-				write_frame_for_accuracy_test(output_image_directory, frame, image_np)
-			except:
-				pass
-		
-		"""
-
 
 
 		"""
@@ -930,48 +960,3 @@ if __name__ == '__main__':
 		output_video_filepath = 'output_video/shot_%d_tracking_3.mp4' % i
 		write_mp4_video(ordered_frame_paths, 'JPEG', output_video_filepath)
 		"""
-
-
-		#
-		#	find distance between highest score player and highest score ball
-		#
-
-		#size of basketball : number of pixels
-		#NBA is 29.5 inches in circumference
-		#diameter = 29.5/(3.14) = 9.4 in
-
-		"""
-		# FLAGS to detect state
-
-		PERSON_WITH_BALL = bool
-
-
-		idea:
-			anaylize scene purley in terms of basketball box and person box
-
-			scale and center around person? how to scale and center
-
-
-		"""
-
-
-		"""
-		#tmp edit first saved image info bundel paths add "frames_shot_1"
-		new_image_info_bundel = {}
-		for path, image_info in image_info_bundel.items():
-			#add_dir = "/frames_shot_1"
-			#prefix, filename = os.path.split(path)
-			#new_path = os.path.join(prefix + add_dir, filename)
-			new_image_info = image_info.copy()
-			new_image_info['image_folder'] = "frames_shot_1"
-			new_image_info_bundel[path] = new_image_info
-
-		print(new_image_info_bundel)
-
-		with open(image_info_bundel_filepath, 'w') as file:
-			file.write(json.dumps(new_image_info_bundel))
-		"""
-
-	
-
-
