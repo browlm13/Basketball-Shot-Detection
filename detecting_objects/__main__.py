@@ -559,7 +559,7 @@ if __name__ == '__main__':
 	# Initial Evaluation
 	#
 
-	for i in range(2,3):
+	for i in range(16,17):
 
 		print ("video %d" % i)
 
@@ -693,29 +693,47 @@ if __name__ == '__main__':
 			cleaned_trajectory_points = trajectory_points[trajectory_points[:, enum['ball mark x column']] != enum['no data'], :] 	# extract all rows with their is data 
 			frames, xs, ys, state = cleaned_trajectory_points.T
 
-			#total frame range for plotting regreesion lines
-			total_frame_range = np.linspace(frames[0], frames[-1], frames[-1]- frames[0])
+			if len(frames) > 1: 
 
-			#xs - degreen 1 regression fit
-			p1 = np.polyfit(frames, xs, 1)
-			fit_xs = np.polyval(p1,total_frame_range)
+				#total frame range for plotting regreesion lines
+				total_frame_range = np.linspace(frames[0], frames[-1], frames[-1]- frames[0])
 
-			# ignore missing data points in error calculation
-			plt.plot(total_frame_range, fit_xs, 'o-', label = 'estimate', markersize=1)
-			plt.plot(frames, xs, '.', label = 'original data', markersize=10)
+				"""
+				# this correctly identifies bad datapoints by r value
+				#test for video 16 tmp cut off n last frames
+				n = 5
+				frames = frames[:-n]
+				total_frame_range[:-n]
+				xs = xs[:-n]
+				ys = ys[:-n]
+				"""
 
-			#ys - degreen 2 regression fit
-			p2 = np.polyfit(frames, ys, 2)
-			fit_ys = np.polyval(p2,total_frame_range)
+				#xs - degreen 1 regression fit
+				p1 = np.polyfit(frames, xs, 1)
+				fit_xs = np.polyval(p1,total_frame_range)
 
-			# tmp make negitive to compensate for stupid image y coordinates
-			#neg = lambda t: t*(-1)
-			#vfunc = np.vectorize(neg)
-			#fit_ys = vfunc(fit_ys)
-			#ys = vfunc(ys)
+				# ignore missing data points in error calculation
+				plt.plot(total_frame_range, fit_xs, 'o-', label = 'estimate', markersize=1)			#looking at video 16 you can notice bad data points for x axis
+				plt.plot(frames, xs, '.', label = 'original data', markersize=10)
 
-			plt.plot(total_frame_range, fit_ys, 'o-', label = 'estimate ys', markersize=1)
-			plt.plot(frames, ys, '.', label = 'original ys', markersize=10)
+				#find regression line for x versus frames
+				from scipy import stats
+				slope, intercept, r_value, p_value, std_err = stats.linregress(xs, frames)
+				print(r_value)
+
+				#ys - degreen 2 regression fit
+				#p2 = np.polyfit(frames, ys, 2)
+				p2 = np.polyfit(frames, ys, 4)				# degree 4 for off angles
+				fit_ys = np.polyval(p2,total_frame_range)
+
+				# tmp make negitive to compensate for stupid image y coordinates
+				#neg = lambda t: t*(-1)
+				#vfunc = np.vectorize(neg)
+				#fit_ys = vfunc(fit_ys)
+				#ys = vfunc(ys)
+
+				#plt.plot(total_frame_range, fit_ys, 'o-', label = 'estimate ys', markersize=1)
+				#plt.plot(frames, ys, '.', label = 'original ys', markersize=10)
 			
 			#plt.show()
 
