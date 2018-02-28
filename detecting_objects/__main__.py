@@ -514,20 +514,44 @@ def frame_cycle(image_info_bundel, input_frame_path_dict, output_frames_director
 		logger.error("not continuous")
 
 
-#arc length parametrization of the Archimedean spiral
-#polar formula for the Archimedean spiral: r=a+bθ.
-# constant b and a value
-#Archimedean Spiral length to x,y
-#	l = sqrt(x^2 + y^2)/b
-#def archimedean_spiral_length_to_cartesian(length):
+# source: https://stackoverflow.com/questions/7352684/how-to-find-the-groups-of-consecutive-elements-from-an-array-in-numpy
+def group_consecutives(vals, step=1):
+    """Return list of consecutive lists of numbers from vals (number list)."""
+    run = []
+    result = [run]
+    expect = None
+    for v in vals:
+        if (v == expect) or (expect is None):
+            run.append(v)
+        else:
+            run = [v]
+            result.append(run)
+        expect = v + step
+    return result
 
-#arc length is 
-#Archimedean Spiral length to x,y
-#	x = b*t*cos(l)
-#	y = b*t*sin(l)
-#def archimedean_spiral_length_to_cartesian(length):
+def group_consecutives_by_column(matrix, column, step=1):
+	vals = matrix[:,column]
+	runs = group_consecutives(vals, step)
+
+	run_range_indices = []
+	for run in runs:
+		start = np.argwhere(matrix[:,column] == run[0])[0,0]
+		stop = np.argwhere(matrix[:,column] == run[-1])[0,0] + 1
+		run_range_indices.append([start,stop])
 
 
+	#split matrix into segments (smaller matrices)
+	split_matrices = []
+	for run_range in run_range_indices:
+		start, stop = run_range
+		trajectory_matrix = matrix[start:stop,:]
+		split_matrices.append(trajectory_matrix)
+	
+	return split_matrices
+
+
+def squared_error(ys_orig,ys_line):
+    return sum((ys_line - ys_orig) * (ys_line - ys_orig))
 
 if __name__ == '__main__':
 
@@ -599,6 +623,123 @@ if __name__ == '__main__':
 		#	Mock 1: Assertions: Stable video, 1 person, 1 ball
 		#
 
+		#	Create matrix, ball_data_points, of colums: 
+		#			frame, ball mark x, ball mark y, ball state
+
+		enum = {
+			'no data' : -1,
+			'free ball' : 1,
+			'held ball' : 0,
+			'frame column' : 0,
+			'ball mark x column' : 1,
+			'ball mark y column' : 2,
+			'ball state column' : 3
+
+		}
+
+		# get minimum and maximum frame indexes
+		min_frame, max_frame, continuous = min_max_frames(frame_path_dict)
+
+		#	Matrix - fill with no data
+
+		num_rows = (max_frame + 1) - min_frame
+		num_cols = 4						# frame, ballmark x, ballmark y, ball state (iou bool)
+		ball_data_points = np.full((num_rows, num_cols), enum['no data'])
+
+		# iou boolean lambda function for 'ball mark x column'
+		get_ball_state = lambda person_box, ball_box : enum['held ball'] if (iou(person_box, ball_box) > 0) else enum['free ball']
+
+		# 					fill matrix
+		# 'frame', 'ballmark x', 'ballmark y', 'ball state'
+		assert continuous
+
+		index = 0
+		for frame in range(min_frame, max_frame + 1):
+			frame_path = input_frame_path_dict[frame]
+			frame_info = image_info_bundel[frame_path]
+
+			#get frame ball box and frame person box
+			frame_ball_box = get_high_score_box(frame_info, 'basketball', must_detect=False)
+			frame_person_box = get_high_score_box(frame_info, 'person', must_detect=False)
+
+			# frame number column 'frame column'
+			ball_data_points[index,enum['frame column']] = frame
+
+			#ball mark column 'ball mark x column', 'ball mark y column' (x,y)
+			if (frame_ball_box is not None):
+				frame_ball_mark = get_ball_mark(frame_ball_box)
+				ball_data_points[index,enum['ball mark x column']] = frame_ball_mark[0]
+				ball_data_points[index,enum['ball mark y column']] = frame_ball_mark[1]
+
+			#ball state/iou bool column 'ball state column ''
+			if (frame_ball_box is not None) and (frame_person_box is not None):
+				ball_data_points[index,enum['ball state column']] = get_ball_state(frame_person_box, frame_ball_box)
+
+			index += 1
+
+		# identify likley tranjectory frame ranges and then refine for [ min r value ]
+		#		1. min and max of frame range adjustment 			# for [ min r value ]
+		#		2. matrix transformation diffrent axis  			# for [ min r value ]	
+
+		# first guess iteration of trajectory ranges, ranges are cut at frames with ball state column value == 'held ball'
+		possible_trajectory_data_points = ball_data_points[ball_data_points[:, enum['ball state column']] != enum['held ball'], :] 	# extract all rows with the ball state column does not equal held ball
+		possible_trajectory_matrices = group_consecutives_by_column(possible_trajectory_data_points, enum['frame column'])			# split into seperate matricies for ranges
+
+		#for each matrix find regression formulas
+		for i in range(len(possible_trajectory_matrices)):
+			trajectory_points = possible_trajectory_matrices[i]
+
+			#remove missing datapoints
+			cleaned_trajectory_points = trajectory_points[trajectory_points[:, enum['ball mark x column']] != enum['no data'], :] 	# extract all rows with their is data 
+			frames, xs, ys, state = cleaned_trajectory_points.T
+
+			#total frame range for plotting regreesion lines
+			total_frame_range = np.linspace(frames[0], frames[-1], frames[-1]- frames[0])
+
+			#xs - degreen 1 regression fit
+			p1 = np.polyfit(frames, xs, 1)
+			fit_xs = np.polyval(p1,total_frame_range)
+
+			# ignore missing data points in error calculation
+			plt.plot(total_frame_range, fit_xs, 'o-', label = 'estimate', markersize=1)
+			plt.plot(frames, xs, '.', label = 'original data', markersize=10)
+
+			#ys - degreen 2 regression fit
+			p2 = np.polyfit(frames, ys, 2)
+			fit_ys = np.polyval(p2,total_frame_range)
+
+			# tmp make negitive to compensate for stupid image y coordinates
+			#neg = lambda t: t*(-1)
+			#vfunc = np.vectorize(neg)
+			#fit_ys = vfunc(fit_ys)
+			#ys = vfunc(ys)
+
+			plt.plot(total_frame_range, fit_ys, 'o-', label = 'estimate ys', markersize=1)
+			plt.plot(frames, ys, '.', label = 'original ys', markersize=10)
+			
+			#plt.show()
+
+			#print(squared_error())
+	
+			#new_ys = np.array(np.polyval(p2,frames))
+
+		plt.show()
+
+		#ys - degree 2 regression fit
+		#p2 = np.polyfit(np_frames, ys, 2)
+
+		#find regression line for x versus frames
+		#from scipy import stats
+		#slope, intercept, r_value, p_value, std_err = stats.linregress(np_frames, shifted_xs)
+
+		# create plot
+		#plt.plot(t, y, '.', label = 'original data', markersize=5)
+		#plt.plot(t, y_est, 'o-', label = 'estimate', markersize=1)
+		#plt.xlabel('time')
+		#plt.ylabel('sensor readings')
+		#plt.title('least squares fit of degree 5')
+		#plt.savefig('sample.png')
+		"""
 		#	step 1: create matrix of colums: column 1 = ball marks ((x,y) or -1 (non)), column 2 = iou (-1,0,1) 
 		#			 take frame from video with single ball single person. Return (-1,0,1) for iou not avaiable, 0, >0
 
@@ -612,6 +753,10 @@ if __name__ == '__main__':
 			'ball without person' : 1,
 			'ball with person' : 0
 		}
+
+		#
+		# Todo: add frame numbers to couln in array
+		#
 
 		# create np.matrix filled with -1's: shape 2 columns, numeber of frames in video (rather: max-min)
 		num_rows = max_frame - min_frame
@@ -671,7 +816,15 @@ if __name__ == '__main__':
 		print(collected_trajectory_matrix)
 		print(possible_trajectory_frame_ranges)
 
+		collected_trajectory_matrix_snake_coordinates_ball_marks = collected_trajectory_matrix[:,0]
 
+		trajectory_data_points_arrays = []
+		for frame_range in possible_trajectory_frame_ranges:
+			trajectory_data_points_frame_range = collected_trajectory_matrix_snake_coordinates_ball_marks[frame_range[0]:frame_range[1]]
+			trajectory_data_points_arrays.append(trajectory_data_points_frame_range)
+
+		print (trajectory_data_points_arrays)
+		"""
 
 
 		# step 1:
