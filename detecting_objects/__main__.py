@@ -47,8 +47,8 @@ def write_mp4_video(ordered_image_paths, ext, output_mp4_filepath):
 	out = cv2.VideoWriter(output_mp4_filepath, fourcc, 20.0, (width, height))
 
 	for image_path in ordered_image_paths:
-	    frame = cv2.imread(image_path)
-	    out.write(frame) # Write out frame to video
+		frame = cv2.imread(image_path)
+		out.write(frame) # Write out frame to video
 
 	# Release everything if job is finished
 	out.release()
@@ -516,18 +516,18 @@ def frame_cycle(image_info_bundel, input_frame_path_dict, output_frames_director
 
 # source: https://stackoverflow.com/questions/7352684/how-to-find-the-groups-of-consecutive-elements-from-an-array-in-numpy
 def group_consecutives(vals, step=1):
-    """Return list of consecutive lists of numbers from vals (number list)."""
-    run = []
-    result = [run]
-    expect = None
-    for v in vals:
-        if (v == expect) or (expect is None):
-            run.append(v)
-        else:
-            run = [v]
-            result.append(run)
-        expect = v + step
-    return result
+	"""Return list of consecutive lists of numbers from vals (number list)."""
+	run = []
+	result = [run]
+	expect = None
+	for v in vals:
+		if (v == expect) or (expect is None):
+			run.append(v)
+		else:
+			run = [v]
+			result.append(run)
+		expect = v + step
+	return result
 
 def group_consecutives_by_column(matrix, column, step=1):
 	vals = matrix[:,column]
@@ -551,7 +551,64 @@ def group_consecutives_by_column(matrix, column, step=1):
 
 
 def squared_error(ys_orig,ys_line):
-    return sum((ys_line - ys_orig) * (ys_line - ys_orig))
+	return sum((ys_line - ys_orig) * (ys_line - ys_orig))
+
+
+# 												ball collected data points matrix (ball_cdpm)
+#
+# columns: frame, x, y, ball state / iou bool
+#
+# enum keys: 
+#			'frame column', 'ball mark x column', 'ball mark y column', 'ball state column'		#columns 
+#			'no data', 'free ball', 'held ball'													#ball states
+#
+# "essentially an alternative representation of image_info_bundel"
+# to access: frames, xs, ys, state = ball_cdpm.T
+def get_ball_cdpm( ball_cdpm_enum, input_frame_path_dict, image_info_bundel):
+
+		# get minimum and maximum frame indexes
+		min_frame, max_frame, continuous = min_max_frames(input_frame_path_dict)
+
+		#	Matrix - fill with no data
+
+		num_rows = (max_frame + 1) - min_frame
+		num_cols = 4						# frame, ballmark x, ballmark y, ball state (iou bool)
+		ball_cdpm = np.full((num_rows, num_cols), ball_cdpm_enum['no data'])
+
+		# iou boolean lambda function for 'ball mark x column'
+		get_ball_state = lambda person_box, ball_box : ball_cdpm_enum['held ball'] if (iou(person_box, ball_box) > 0) else ball_cdpm_enum['free ball']
+
+		# 					Fill ball collected data points matrix (ball_cdpm)
+		#
+		# 					'frame', 'ballmark x', 'ballmark y', 'ball state'
+
+		index = 0
+		for frame in range(min_frame, max_frame + 1):
+			frame_path = input_frame_path_dict[frame]
+			frame_info = image_info_bundel[frame_path]
+
+			#get frame ball box and frame person box
+			frame_ball_box = get_high_score_box(frame_info, 'basketball', must_detect=False)
+			frame_person_box = get_high_score_box(frame_info, 'person', must_detect=False)
+
+			# frame number column 'frame column'
+			ball_cdpm[index,ball_cdpm_enum['frame column']] = frame
+
+			#ball mark column 'ball mark x column', 'ball mark y column' (x,y)
+			if (frame_ball_box is not None):
+				frame_ball_mark = get_ball_mark(frame_ball_box)
+				ball_cdpm[index,ball_cdpm_enum['ball mark x column']] = frame_ball_mark[0]
+				ball_cdpm[index,ball_cdpm_enum['ball mark y column']] = frame_ball_mark[1]
+
+			#ball state/iou bool column 'ball state column ''
+			if (frame_ball_box is not None) and (frame_person_box is not None):
+				ball_cdpm[index,ball_cdpm_enum['ball state column']] = get_ball_state(frame_person_box, frame_ball_box)
+
+			index += 1
+
+		# return matrix
+		return ball_cdpm
+
 
 if __name__ == '__main__':
 
@@ -599,7 +656,7 @@ if __name__ == '__main__':
 		image_info_bundel = filter_selected_categories(filter_minimum_score_threshold(image_info_bundel, min_score_thresh), selected_categories_list)
 
 		#get frame image paths in order
-		frame_path_dict = get_frame_path_dict(video_frames_dirpath)
+		input_frame_path_dict = get_frame_path_dict(video_frames_dirpath)
 
 
 
@@ -607,7 +664,6 @@ if __name__ == '__main__':
 		#	Call function for frame cycle
 		#
 
-		input_frame_path_dict = get_frame_path_dict(video_frames_dirpath)
 		#output_video_file = 'output_video/shot_%d_pure_block_history.mp4' % i
 		#frame_cycle(image_info_bundel, input_frame_path_dict, output_frames_directory, output_video_file, pure_boundary_box_frame, apply_history=True)
 		#frame_cycle(image_info_bundel, input_frame_path_dict, output_frames_directory, output_video_file, stabalize_to_person_mark_frame)
@@ -623,10 +679,13 @@ if __name__ == '__main__':
 		#	Mock 1: Assertions: Stable video, 1 person, 1 ball
 		#
 
-		#	Create matrix, ball_data_points, of colums: 
-		#			frame, ball mark x, ball mark y, ball state
+		#
+		#
+		#	Build ball data points matrix  (ball_cdpm)
+		#													columns: frame, ball mark x, ball mark y, ball state
+		#													ball states: no data, held ball, free ball
 
-		enum = {
+		ball_cdpm_enum = {
 			'no data' : -1,
 			'free ball' : 1,
 			'held ball' : 0,
@@ -634,500 +693,142 @@ if __name__ == '__main__':
 			'ball mark x column' : 1,
 			'ball mark y column' : 2,
 			'ball state column' : 3
-
 		}
 
-		# get minimum and maximum frame indexes
-		min_frame, max_frame, continuous = min_max_frames(frame_path_dict)
+		ball_cdpm = get_ball_cdpm(ball_cdpm_enum, input_frame_path_dict, image_info_bundel)
+		
 
-		#	Matrix - fill with no data
+		# try plotting in 3D
+		from mpl_toolkits import mplot3d
 
-		num_rows = (max_frame + 1) - min_frame
-		num_cols = 4						# frame, ballmark x, ballmark y, ball state (iou bool)
-		ball_data_points = np.full((num_rows, num_cols), enum['no data'])
+		#remove no data datapoints
+		cleaned_ball_cdpm = ball_cdpm[ball_cdpm[:, ball_cdpm_enum['ball mark x column']] != ball_cdpm_enum['no data'], :] 	# extract all rows with their is data 
+		frames, xs, ys, ball_states = cleaned_ball_cdpm.T
 
-		# iou boolean lambda function for 'ball mark x column'
-		get_ball_state = lambda person_box, ball_box : enum['held ball'] if (iou(person_box, ball_box) > 0) else enum['free ball']
+		# tmp make negitive to compensate for stupid image y coordinates
+		neg = lambda t: t*(-1)
+		vfunc = np.vectorize(neg)
+		ys = vfunc(ys)
 
-		# 					fill matrix
-		# 'frame', 'ballmark x', 'ballmark y', 'ball state'
-		assert continuous
+		# ball state enumn 
+		ball_state_enum = {
+			'no data' : -1,
+			'free ball' : 1,
+			'held ball' : 0
+		}
+		
+		# inverse map
+		inv_ball_state_enum = {
+			v: k for k, v in ball_state_enum.items()
+		}
 
-		index = 0
-		for frame in range(min_frame, max_frame + 1):
-			frame_path = input_frame_path_dict[frame]
-			frame_info = image_info_bundel[frame_path]
+		# change color for ball state
+		ball_state_colors_enum = {
+			'free ball' : 'g',
+			'held ball' : 'r'
+		}
 
-			#get frame ball box and frame person box
-			frame_ball_box = get_high_score_box(frame_info, 'basketball', must_detect=False)
-			frame_person_box = get_high_score_box(frame_info, 'person', must_detect=False)
+		ball_state_colors = [] 
+		for bs in ball_states:
+			i_state = inv_ball_state_enum[bs]
+			color = ball_state_colors_enum[i_state]
+			ball_state_colors.append(color)
 
-			# frame number column 'frame column'
-			ball_data_points[index,enum['frame column']] = frame
+		fig = plt.figure()
+		ax = plt.axes(projection='3d')
+		ax.scatter3D(xs, ys, frames, c=ball_state_colors, cmap='Greens')
+		ax.set_xlabel('Xs')
+		ax.set_ylabel('Ys')
+		ax.set_zlabel('frames')
 
-			#ball mark column 'ball mark x column', 'ball mark y column' (x,y)
-			if (frame_ball_box is not None):
-				frame_ball_mark = get_ball_mark(frame_ball_box)
-				ball_data_points[index,enum['ball mark x column']] = frame_ball_mark[0]
-				ball_data_points[index,enum['ball mark y column']] = frame_ball_mark[1]
 
-			#ball state/iou bool column 'ball state column ''
-			if (frame_ball_box is not None) and (frame_person_box is not None):
-				ball_data_points[index,enum['ball state column']] = get_ball_state(frame_person_box, frame_ball_box)
-
-			index += 1
+		#
+		# try regression prediction
+		#
 
 		# identify likley tranjectory frame ranges and then refine for [ min r value ]
 		#		1. min and max of frame range adjustment 			# for [ min r value ]
 		#		2. matrix transformation diffrent axis  			# for [ min r value ]	
 
 		# first guess iteration of trajectory ranges, ranges are cut at frames with ball state column value == 'held ball'
-		possible_trajectory_data_points = ball_data_points[ball_data_points[:, enum['ball state column']] != enum['held ball'], :] 	# extract all rows with the ball state column does not equal held ball
-		possible_trajectory_matrices = group_consecutives_by_column(possible_trajectory_data_points, enum['frame column'])			# split into seperate matricies for ranges
+		possible_trajectory_data_points = ball_cdpm[ball_cdpm[:, ball_cdpm_enum['ball state column']] != ball_cdpm_enum['held ball'], :] 	# extract all rows with the ball state column does not equal held ball
+		possible_trajectory_matrices = group_consecutives_by_column(possible_trajectory_data_points, ball_cdpm_enum['frame column'])			# split into seperate matricies for ranges
 
 		#for each matrix find regression formulas
+		p_xyzs = []
 		for i in range(len(possible_trajectory_matrices)):
 			trajectory_points = possible_trajectory_matrices[i]
 
 			#remove missing datapoints
-			cleaned_trajectory_points = trajectory_points[trajectory_points[:, enum['ball mark x column']] != enum['no data'], :] 	# extract all rows with their is data 
-			frames, xs, ys, state = cleaned_trajectory_points.T
+			cleaned_trajectory_points = trajectory_points[trajectory_points[:, ball_cdpm_enum['ball mark x column']] != ball_cdpm_enum['no data'], :] 	# extract all rows with their is data 
+			cframes, cxs, cys, cstate = cleaned_trajectory_points.T
 
-			if len(frames) > 1: 
+			#if length of possible trajectory is more than 1 data point
+			if len(cframes) > 1:
 
-				#total frame range for plotting regreesion lines
-				total_frame_range = np.linspace(frames[0], frames[-1], frames[-1]- frames[0])
+				#total frame range for plotting regreesion lines - so path is not line segments
+				#total_frame_range = np.linspace(frames[0], frames[-1], frames[-1]- frames[0])
+				trajectory_total_frame_range = np.linspace(cframes[0], cframes[-1], cframes[-1] - cframes[0])	#trajectory total frame range
 
-				"""
-				# this correctly identifies bad datapoints by r value
-				#test for video 16 tmp cut off n last frames
-				n = 5
-				frames = frames[:-n]
-				total_frame_range[:-n]
-				xs = xs[:-n]
-				ys = ys[:-n]
-				"""
+				# try plots removing trailing datapoints
+				old_frames, old_xs, old_ys, old_trajectory_total_frame_range = cframes, cxs, cys, trajectory_total_frame_range
 
-				#xs - degreen 1 regression fit
-				p1 = np.polyfit(frames, xs, 1)
-				fit_xs = np.polyval(p1,total_frame_range)
+				# always keep two datapoints
+				for n in range(len(cframes)-2, 0, -1):
+					cframes, cxs, cys, trajectory_total_frame_range = old_frames, old_xs, old_ys, old_trajectory_total_frame_range  # reset
 
-				# ignore missing data points in error calculation
-				plt.plot(total_frame_range, fit_xs, 'o-', label = 'estimate', markersize=1)			#looking at video 16 you can notice bad data points for x axis
-				plt.plot(frames, xs, '.', label = 'original data', markersize=10)
+					#cut off n last frames
+					cframes = cframes[:-n]
+					trajectory_total_frame_range[:-n]
+					cxs = cxs[:-n]
+					cys = cys[:-n]
 
-				#find regression line for x versus frames
-				from scipy import stats
-				slope, intercept, r_value, p_value, std_err = stats.linregress(xs, frames)
-				print(r_value)
+					#xs - degreen 1 regression fit (cleaned xs - cxs)
+					p1 = np.polyfit(cframes, cxs, 1)
+					fit_xs = np.polyval(p1, trajectory_total_frame_range)
 
-				#ys - degreen 2 regression fit
-				#p2 = np.polyfit(frames, ys, 2)
-				p2 = np.polyfit(frames, ys, 4)				# degree 4 for off angles
-				fit_ys = np.polyval(p2,total_frame_range)
+					# tmp make negitive to compensate for stupid image y coordinates
+					neg = lambda t: t*(-1)
+					vfunc = np.vectorize(neg)
+					cys = vfunc(cys)
 
-				# tmp make negitive to compensate for stupid image y coordinates
-				#neg = lambda t: t*(-1)
-				#vfunc = np.vectorize(neg)
-				#fit_ys = vfunc(fit_ys)
-				#ys = vfunc(ys)
+					#ys - degreen 2 regression fit (cleaned ys - cys)
+					p2 = np.polyfit(cframes, cys, 2)
+					fit_ys = np.polyval(p2, trajectory_total_frame_range)
 
-				#plt.plot(total_frame_range, fit_ys, 'o-', label = 'estimate ys', markersize=1)
-				#plt.plot(frames, ys, '.', label = 'original ys', markersize=10)
-			
-			#plt.show()
+					#add trajectory path
+					p_xyzs.append((fit_xs, fit_ys, trajectory_total_frame_range, n))
+		
+		#n_value is number of dropped datapoints
+		#random color
+		for predicted_trajectory_points in p_xyzs:
+			pxs, pys, pzs, n_value = predicted_trajectory_points
+			ax.plot3D(pxs, pys, pzs, c=np.random.rand(3,1), linewidth=1, label=n_value)
 
-			#print(squared_error())
-	
-			#new_ys = np.array(np.polyval(p2,frames))
+		# set minimum and maximum x and y values from min and maxs of actual datapoints observed
+		axes = plt.gca()
+		axes.set_xlim([xs.min(),xs.max()])
+		axes.set_ylim([ys.min(),ys.max()])
 
+		#display
+		plt.legend()
 		plt.show()
 
-		#ys - degree 2 regression fit
-		#p2 = np.polyfit(np_frames, ys, 2)
+#
+# 	Extract Ball Trajectory Formula
+#
 
-		#find regression line for x versus frames
-		#from scipy import stats
-		#slope, intercept, r_value, p_value, std_err = stats.linregress(np_frames, shifted_xs)
 
-		# create plot
-		#plt.plot(t, y, '.', label = 'original data', markersize=5)
-		#plt.plot(t, y_est, 'o-', label = 'estimate', markersize=1)
-		#plt.xlabel('time')
-		#plt.ylabel('sensor readings')
-		#plt.title('least squares fit of degree 5')
-		#plt.savefig('sample.png')
-		"""
-		#	step 1: create matrix of colums: column 1 = ball marks ((x,y) or -1 (non)), column 2 = iou (-1,0,1) 
-		#			 take frame from video with single ball single person. Return (-1,0,1) for iou not avaiable, 0, >0
+#
+#	Mock 1: Assertions: Stable video, 1 person, 1 ball
+#
 
-		# create matrix for ball_marks and iou - collected_trajectory_matrix
+#
+#	collected data points matrix : cdpm
+#
 
-		# get minimum and maximum frame indexes
-		min_frame, max_frame, continuous = min_max_frames(frame_path_dict)
+#
+#	general data points matrix : frame, x1, y1, x2, y2
+#
 
-		enum = {
-			'no data' : -1,
-			'ball without person' : 1,
-			'ball with person' : 0
-		}
 
-		#
-		# Todo: add frame numbers to couln in array
-		#
-
-		# create np.matrix filled with -1's: shape 2 columns, numeber of frames in video (rather: max-min)
-		num_rows = max_frame - min_frame
-		num_cols = 2
-		collected_trajectory_matrix = np.full((num_rows, num_cols), enum['no data'])
-
-		# iou boolean lambda function for column two
-		iou_bool = lambda person_box, ball_box : enum['ball with person'] if (iou(person_box, ball_box) > 0) else enum['ball without person']
-
-		# fill matrix
-		assert continuous
-
-		for frame in range(min_frame, max_frame + 1):
-			frame_path = input_frame_path_dict[frame]
-			frame_info = image_info_bundel[frame_path]
-
-			#get frame ball box and frame person box
-			frame_ball_box = get_high_score_box(frame_info, 'basketball', must_detect=False)
-			frame_person_box = get_high_score_box(frame_info, 'person', must_detect=False)
-
-			#iou bool column two
-			if (frame_ball_box is not None) and (frame_person_box is not None):
-				collected_trajectory_matrix[frame,1] = iou_bool(frame_person_box, frame_ball_box)
-
-			#snake coordinates ball mark column 1
-			if (frame_ball_box is not None):
-				frame_ball_mark = get_ball_mark(frame_ball_box)
-				frame_ball_mark_snake_coordinate = snake_coordinates.to_snake_head(frame_ball_mark)
-				collected_trajectory_matrix[frame,0] = frame_ball_mark_snake_coordinate
-
-		
-		# identify likley tranjectory frame ranges and then refine for [ min r value ]
-		#		1. min and max of frame range adjustment 			# for [ min r value ]
-		#		2. matrix transformation diffrent axis  			# for [ min r value ]
-
-		# first guess iteration of trajectory ranges - let o's (ball with person) act as seperators, ignore missing values -1's (no data)
-		possible_trajectory_frame_ranges = []
-		buffer_trajectory_frame_range = [-1,-1]
-		for frame, frame_iou_bool in enumerate(collected_trajectory_matrix[:,1]):
-
-			if (frame_iou_bool == 0) and (buffer_trajectory_frame_range[0] != -1):
-				print("cap")
-				buffer_trajectory_frame_range[1] = frame -1
-				possible_trajectory_frame_ranges.append(buffer_trajectory_frame_range)
-				buffer_trajectory_frame_range = [-1,-1]
-
-			if (frame_iou_bool == 1) and (buffer_trajectory_frame_range[0] == -1):
-				buffer_trajectory_frame_range[0] = frame
-
-			if (frame_iou_bool == -1) and (buffer_trajectory_frame_range[0] == -1):
-				buffer_trajectory_frame_range[0] = frame
-
-			if frame == max_frame-1:
-				buffer_trajectory_frame_range[1] = frame -1
-				possible_trajectory_frame_ranges.append(buffer_trajectory_frame_range)
-
-		print(collected_trajectory_matrix)
-		print(possible_trajectory_frame_ranges)
-
-		collected_trajectory_matrix_snake_coordinates_ball_marks = collected_trajectory_matrix[:,0]
-
-		trajectory_data_points_arrays = []
-		for frame_range in possible_trajectory_frame_ranges:
-			trajectory_data_points_frame_range = collected_trajectory_matrix_snake_coordinates_ball_marks[frame_range[0]:frame_range[1]]
-			trajectory_data_points_arrays.append(trajectory_data_points_frame_range)
-
-		print (trajectory_data_points_arrays)
-		"""
-
-
-		# step 1:
-		#			-identify frame ranges where likley trajectories are occuring: [(trajectory_1_start_frame, trajectory_1_end_frame), ...]
-		#				possible items of focus: frame, person_mark, ball_mark, iou for each frame
-		
-		# step 2: 
-		#			-calculate regression trajectory formula for person marks around known data points
-		#
-
-		# step 3: 
-		#			-shift ball marks acording to person regression trajectory formula
-		#
-
-		# step 4: 
-		#			-calculate regression trajectory formula for shifted ball marks around known data points
-		#
-
-		"""
-
-				methods:
-							-extract person and ball marks and iou values for each frame with values present
-								-
-		"""
-
-
-		# get minimum and maximum frame indexes
-		min_frame, max_frame, continuous = min_max_frames(frame_path_dict)
-
-		# frame cycle
-		if False: #continuous:
-		
-			#
-			#histories for ball trajectory plotting
-			#
-			person_marks = {}
-			ball_marks = {}
-
-			stop_collecting = False
-			for frame in range(min_frame, max_frame + 1):
-				frame_path = frame_path_dict[frame]
-				image_info = image_info_bundel[frame_path]
-
-				#get person and ball boxes
-				person_box = get_high_score_box(image_info, 'person', must_detect=False)
-				ball_box = get_high_score_box(image_info, 'basketball', must_detect=False)
-
-				if person_box is not None:
-
-						if not stop_collecting:
-							#histories for ball trajectory plotting
-							person_marks[frame] = get_person_mark(person_box)
-
-						if ball_box is not None:
-
-							#iou overlap
-							if (iou(person_box, ball_box) == 0) and (not stop_collecting):
-								#histories for ball trajectory plotting
-								ball_marks[frame] = get_ball_mark(ball_box)
-								print(frame)
-
-							#break on rejoin
-							if (iou(person_box, ball_box) > 0) and (bool(ball_marks)):
-								stop_collecting = True
-			
-
-			try:
-
-
-				"""
-					starting at first frame ball is detected
-					make create element for each possible frame from detection to end
-					fill each known gap with balls shifted coordinates
-						shifted coordinates: bx-px, by-py
-				"""
-
-				known_shifted_coordinates = []
-				frame_number = []
-
-				shifted_ball_marks = {}
-				shifted_ball_marks_x = {}
-				shifted_ball_marks_y = {}
-
-				for frame, ball_mark in ball_marks.items():
-					person_mark = person_marks[frame]
-					new_ball_mark = (ball_mark[0] - person_mark[0], ball_mark[1] - person_mark[1])
-					shifted_ball_marks[frame] = new_ball_mark
-
-					shifted_ball_marks_x[frame] = ball_mark[0] - person_mark[0]
-					#shifted_ball_marks_y[frame] = person_mark[1]- ball_mark[1] #ball_mark[1] - person_mark[1]
-					shifted_ball_marks_y[frame] = ball_mark[1] - person_mark[1]
-
-
-				frames, shifted_xs = zip(*shifted_ball_marks_x.items())
-				frames, shifted_ys = zip(*shifted_ball_marks_y.items())
-
-				#print(frames)
-				#print(shifted_xs)
-				#print(shifted_ys)
-
-				np_frames = np.array(list(frames))
-				np_shifted_xs = np.array(list(shifted_xs))
-				np_shifted_ys = np.array(list(shifted_ys))
-
-				fig = plt.figure()
-				#ax = fig.add_subplot(1, 1, 1)
-				#ax.scatter(np_frames, shifted_xs)
-				#plt.show()
-
-				#find regression line for x versus frames
-				#from scipy import stats
-				#slope, intercept, r_value, p_value, std_err = stats.linregress(np_frames, shifted_xs)
-				#print("slope: %f" % slope)
-				#print("intercept: %f" % intercept)
-				#print("r_value: %f" % r_value)
-
-				#xs - degreen 1 regression fit
-				p1 = np.polyfit(np_frames, shifted_xs, 1)
-				#plt.plot(np_frames, np.polyval(p1,np_frames))
-
-				#ys - degree 2 regression fit
-				p2 = np.polyfit(np_frames, shifted_ys, 2)
-				#plt.plot(np_frames, np.polyval(p2,np_frames), 'r-')
-				#plt.show()
-
-
-				# use new regression fit formulas to find actual values at x
-
-				regression_shifted_ball_marks = []
-
-				for frame in range(np_frames.min(), np_frames.max() +1):
-					shifted_x_ball_mark = np.polyval(p1, frame)
-					shifted_y_ball_mark = np.polyval(p2, frame)
-					regression_shifted_ball_marks.append((shifted_x_ball_mark,shifted_y_ball_mark))
-
-				regression_shifted_ball_marks_x, regression_shifted_ball_marks_y = zip(*regression_shifted_ball_marks)
-				#plt.plot(regression_shifted_ball_marks_x, regression_shifted_ball_marks_y, 'r')
-				#plt.plot(regression_shifted_ball_marks_y, regression_shifted_ball_marks_x, 'r')
-				#plt.plot(regression_shifted_ball_marks_y, np_frames)
-				#plt.show()
-
-
-				"""
-				# convert regression shifted ballmarks to original axis
-				regression_ball_marks = {}
-				for frame in range(np_frames.min(), np_frames.max() +1):
-					shifted_x_ball_mark = np.polyval(p1, frame)
-					shifted_y_ball_mark = np.polyval(p2, frame)
-
-					person_mark = person_marks[frame]
-
-					#old_axis_ball_mark = (shifted_x_ball_mark + person_mark[0], person_mark[1] + shifted_y_ball_mark)
-					old_axis_ball_mark = (int(shifted_x_ball_mark + person_mark[0]), int(shifted_y_ball_mark + person_mark[1]))
-					regression_ball_marks[frame] = old_axis_ball_mark
-
-				print(regression_ball_marks)
-				print(ball_marks)
-
-
-
-				#write to images / video
-				for frame in range(min_frame, max_frame + 1):
-					frame_path = frame_path_dict[frame]
-					frame_image = cv2.imread(frame_path)	#read image
-
-					if frame == np_frames.min():
-						draw_circle(frame_image, regression_ball_marks[frame], color=(0,0,255))	#mark
-
-					# write images
-					write_frame_for_accuracy_test(output_frames_directory, frame, frame_image)
-
-				# write video
-				frame_directory_to_video(output_frames_directory, output_video_file)
-
-				"""
-				#only collect for acceptable range
-
-				regression_ball_marks = []
-				prev_person_mark = person_marks[np_frames.min()]
-				for frame in range(np_frames.min(), np_frames.max() +1):
-					shifted_x_ball_mark = np.polyval(p1, frame)
-					shifted_y_ball_mark = np.polyval(p2, frame)
-
-					person_mark = person_marks[frame]
-
-					if (person_mark is not None):
-						#old_axis_ball_mark = (shifted_x_ball_mark + person_mark[0], person_mark[1] + shifted_y_ball_mark)
-						old_axis_ball_mark = (int(shifted_x_ball_mark + person_mark[0]), int(shifted_y_ball_mark + person_mark[1]))
-						regression_ball_marks.append(old_axis_ball_mark)
-
-						prev_person_mark = person_mark
-					else:
-						old_axis_ball_mark = (int(shifted_x_ball_mark + prev_person_mark[0]), int(shifted_y_ball_mark + prev_person_mark[1]))
-						regression_ball_marks.append(old_axis_ball_mark)
-
-				#print(regression_ball_marks)
-				#print(ball_marks)
-
-
-				#write to images / video
-				count = 0
-				for frame in range(min_frame, max_frame + 1):
-
-					try: 
-						frame_path = frame_path_dict[frame]
-						frame_image = cv2.imread(frame_path)	#read image
-
-						if (frame >= np_frames.min()) and (frame <= np_frames.max()): #<
-							draw_circle(frame_image, regression_ball_marks[count], color=(0,0,255))	#mark
-							count = count +1
-
-						# write images
-						write_frame_for_accuracy_test(output_frames_directory, frame, frame_image)
-
-					except: pass
-
-				# write video
-				frame_directory_to_video(output_frames_directory, output_video_file)
-
-			except: pass
-			"""
-
-			#ax.scatter(np_frames, shifted_ys)
-			#plt.show()
-
-			#find regression line for x versus frames
-			#from scipy import stats
-			#slope, intercept, r_value, p_value, std_err = stats.linregress(np_frames, shifted_xs)
-			#print("slope: %f" % slope)
-			#print("intercept: %f" % intercept)
-			#print("r_value: %f" % r_value)
-
-
-			#not quite the mean
-			#print(np.mean(np_shifted_xs))
-
-			#find the mean
-			#frame_difrence = np.maximum(np_frames) - np.minimum(np_frames)
-			"""
-
-
-	
-
-
-		"""
-			-ball should move equal amounts horizontally each frame after shot
-			-matrix of ball mark center points -> evenly space points off of mean seperation for path estimation
-			-you can aply gravitys pull and calculate the mean seperation for veriticle points also
-			-try applying these rules to centering around person mark vs original
-
-			1. find array of person marks
-			2. find array of ball marks
-			3. calculate distance to ball where person is origin array of ball marks (shifted ball marks)
-			4. plot
-			5. find mean x seperation of shifted ball marks
-			6. linspace x ball marks according to that
-
-			gravity correction
-			(assume like 24 frames a second)
-			it will be a parabola that explains the speed or distnace downward or upward
-		"""
-
-
-		"""
-		person_areas = [box_area(box) for box in person_boxes]
-		basketball_areas = [box_area(box) for box in ball_boxes]
-		print("person boxes: " + str(person_areas))
-		print("basketball boxes: " + str(basketball_areas))
-
-		person_shs = [height_squared(box) for box in person_boxes]
-		print(person_shs)
-		"""
-
-		
-		"""
-		# write video
-		output_frame_paths_dict = get_frame_path_dict(output_image_directory)
-		ordered_frame_paths = []
-		input_frame_paths_dict = frame_path_dict	#for errors
-		for frame in range(min_frame, max_frame + 1):
-			try:
-				ordered_frame_paths.append(output_frame_paths_dict[frame])
-			except: 
-				ordered_frame_paths.append(input_frame_paths_dict[frame])
-
-		output_video_filepath = 'output_video/shot_%d_tracking_3.mp4' % i
-		write_mp4_video(ordered_frame_paths, 'JPEG', output_video_filepath)
-		"""
