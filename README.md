@@ -6,8 +6,8 @@
 
 ## Trajectory Extrapolation
 ### Tolerant to Missing Datapoints
+![Trajectory](shot_2.png)
 ![Shot with missing datapoints](shot_2.gif)
-![Shot with missing datapoints](shot_2.png)
 
 ## End of Shot detection 
 ### (Exlude Data Points After Ball Hits Objects)
