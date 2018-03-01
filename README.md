@@ -3,6 +3,7 @@
 ### L.J. Brown, Zihao Mao, Preston Deason, Austin Wiedebusch
 
 ![Shot with missing datapoints](shot_2.gif)
+![Shot with missing datapoints](shot_2.png)
 
 ## Cascade Classification
 
