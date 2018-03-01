@@ -11,4 +11,3 @@
 ## Trajectory Extrapolation With Intelligent Ending 
 ### (Exlude Data Points After Ball Hits Net Or Other Objects)
 ![Hits net piecewise linear regression](shot_16.gif)
-![Hits net piecewise linear regression](shot_16.png)
