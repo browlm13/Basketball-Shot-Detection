@@ -2,7 +2,7 @@
 #### ("Working Lists and Objectives")
 ### L.J. Brown, Zihao Mao, Preston Deason, Austin Wiedebusch
 
-![Alt Text](shot_2.gif)
+![Shot with missing datapoints](shot_2.gif)
 
 ## Cascade Classification
 
