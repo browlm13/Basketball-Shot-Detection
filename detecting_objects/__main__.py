@@ -12,6 +12,7 @@ import sys
 import cv2
 from matplotlib import pyplot as plt
 from mpl_toolkits import mplot3d							#	3d plotting
+from scipy import stats 									# 	error rvalue/linear regression
 from piecewise.regressor import piecewise 					# 	piecewise regression
 from piecewise.plotter import plot_data_with_regression
 
@@ -546,7 +547,7 @@ if __name__ == '__main__':
 	# Initial Evaluation
 	#
 
-	for i in range(2,3):
+	for i in range(16,17):
 
 		print ("video %d" % i)
 
@@ -635,6 +636,9 @@ if __name__ == '__main__':
 		#		- colored on ball state (held/free ... no data points are dropped)
 		#
 
+		# std error x value linear regression threshold to apply piecewise linear regression
+		STD_ERROR_THRESHOLD = 0.5
+
 		# Write frames
 		WRITE_FRAMES = False
 
@@ -644,7 +648,7 @@ if __name__ == '__main__':
 		# display plot or show regression segmentation, NOT both
 		SHOW_PLOT = False
 		SHOW_REGRESSION_SEGMENTATION = True
-		SHOW_REGRESSION_SEGMENTATION_Y = True # default show x calculation
+		SHOW_REGRESSION_SEGMENTATION_Y = False # default show x calculation
 
 		# plotting in 3D
 		PLOT_3D = False
@@ -735,19 +739,34 @@ if __name__ == '__main__':
 				#
 				#						peicewise linear regression
 				#
+				# 	Apply if x std error is abole threshold
 				#	Apply peicewise linear regression to x values.
 				#	x values should change linearly if ball is in free flight (ignoring air resistance).
 				#	Use peicewise linear regression to find the point at which the free flying ball hits another object/changes its path
 				#	Find point of intersection for seperate regression lines to find final frame of shot ball trajectory
 				#
 
-				#peicewise model
-				model = piecewise(kframes, kxs)
-				start_frame, stop_frame, coeffs = model.segments[0]		# find start and stopping frame (start_frame, stop_frame) from first line segment, and line formula
+				# test linear regression std error for x values
+				slope, intercept, r_value, p_value, std_err = stats.linregress(kframes, kxs)
+				start_frame, stop_frame = kframes[0], kframes[-1]
 				shot_frame_range = [start_frame, stop_frame]
+				shot_frames = np.linspace(start_frame, stop_frame, stop_frame-start_frame)
 
-				shot_frames = np.linspace(start_frame, stop_frame, stop_frame-start_frame)	# final
-				regression_shot_xs = np.polyval(list(coeffs)[::-1], shot_frames)			# final
+				# regression (not piecewise)
+				#xs - degreen 1 regression fit (cleaned xs - cxs)
+				p1 = np.polyfit(kframes, kxs, 1)
+				regression_shot_xs = np.polyval(p1, shot_frames)
+
+				# apply peicewise linear regression only if x std error is above threshold
+				if std_err >= STD_ERROR_THRESHOLD:
+
+					#peicewise model
+					model = piecewise(kframes, kxs)
+					start_frame, stop_frame, coeffs = model.segments[0]		# find start and stopping frame (start_frame, stop_frame) from first line segment, and line formula
+					shot_frame_range = [start_frame, stop_frame]
+
+					shot_frames = np.linspace(start_frame, stop_frame, stop_frame-start_frame)	# final
+					regression_shot_xs = np.polyval(list(coeffs)[::-1], shot_frames)			# final
 
 
 				#
@@ -848,3 +867,5 @@ if __name__ == '__main__':
 		# write video
 		if WRITE_VIDEO:
 			frame_directory_to_video(output_frames_directory, output_video_file)
+
+
