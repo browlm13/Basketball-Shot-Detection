@@ -5,42 +5,4 @@
 ![Shot with missing datapoints](shot_2.gif)
 ![Shot with missing datapoints](shot_2.png)
 
-## Cascade Classification
-
-(Haar Feature-based Cascade Classifiers)
-
-* Flexible object detection for varaible enviroment conditions (ex: lighting, distance, partial obstruction ...)
-- [ ] Shot release detection
-- [ ] Basketball tracking
-- [ ] Basketball hoop detection
-- [ ] Basketball court line detection
-- [ ] Cutoff detection
-
-## Pose Estimation
-
-* Backboard Orientation
-* Key Orientation
-
-## Trajectory Prediction 
-
-* Kalman filter
-
-## Measured Quantities 
-
-* Trajectory
-* Hangtime
-* Velocity
-
-## Video Stabilization
-
-* Real-time video stabilization
-* Low CPU usage video stabilization
-
-## Platform
-
-* iOS
-
-## Libraries
-
-* OpenCV (Open Source Computer Vision)
-* ARKit
+![Shot with missing datapoints](shot_16.gif)
