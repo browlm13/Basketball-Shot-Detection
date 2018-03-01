@@ -2,6 +2,8 @@
 #### ("Working Lists and Objectives")
 ### L.J. Brown, Zihao Mao, Preston Deason, Austin Wiedebusch
 
+![Alt Text](shot_2.gif)
+
 ## Cascade Classification
 
 (Haar Feature-based Cascade Classifiers)
