@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-# internal
 import logging
 import os
 import glob
@@ -9,24 +8,21 @@ import json
 import PIL.Image as Image
 import numpy as np
 import math
-
-
 import sys
 import cv2
-#import numpy as np
 from matplotlib import pyplot as plt
+from mpl_toolkits import mplot3d							#	3d plotting
+from piecewise.regressor import piecewise 					# 	piecewise regression
+from piecewise.plotter import plot_data_with_regression
 
 # my lib
 #from image_evaluator.src import image_evaluator
-from utils import snake_coordinates
 
 # logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-#note: #(left, right, top, bottom) = box
-
-dodgerblue = (30,144,255)
+#	note: #(left, right, top, bottom) = box
 
 #
 # Test accuracy by writing new images
@@ -53,7 +49,6 @@ def write_mp4_video(ordered_image_paths, ext, output_mp4_filepath):
 	# Release everything if job is finished
 	out.release()
 
-
 def write_frame_for_accuracy_test(output_directory_path, frame, image_np):
 	# if image output directory does not exist, create it
 	if not os.path.exists(output_directory_path): os.makedirs(output_directory_path)
@@ -67,7 +62,6 @@ def write_frame_for_accuracy_test(output_directory_path, frame, image_np):
 	image = Image.fromarray(image_np, 'RGB')
 	image.save(output_file)
 	logger.info("wrote %s to \n\t%s" % (image_file_name, output_file))
-
 
 #list of 4 coordanates for box
 def draw_box_image_np(image_np, box, color=(0,255,0)):
@@ -88,7 +82,6 @@ def get_category_box_score_tuple_list(image_info, category):
 			box_list.append(item['box'])
 			score_list.append(item['score'])
 	return list(zip(score_list, box_list))
-
 
 def get_high_score_box(image_info, category, must_detect=True):
 
@@ -112,8 +105,6 @@ def get_high_score_box(image_info, category, must_detect=True):
 			return category_box_score_tuple_list[high_score_index][1]
 		else:
 			return None
-
-
 
 	high_score_index = 0
 	high_score_value = 0
@@ -156,7 +147,6 @@ def get_ball_radius(ball_box):
 	(left, right, top, bottom) = ball_box
 	return int((right - left)/2)
 
-
 def get_ball_outside_mark(person_box, ball_box):
 	# mark on circumfrence of ball pointing twords person mark
 	ball_mark = get_ball_mark(ball_box)
@@ -180,7 +170,6 @@ def height_squared(box):
 	(left, right, top, bottom) = box
 	return (bottom-top)**2
 
-
 #center (x,y), color (r,g,b)
 def draw_circle(image_np, center, radius=2, color=(0,0,255), thickness=10, lineType=8, shift=0):
 	cv2.circle(image_np, center, radius, color, thickness=thickness, lineType=lineType, shift=shift)
@@ -190,7 +179,6 @@ def draw_person_ball_connector(image_np, person_mark, ball_mark, color=(255,0,0)
 	lineThickness = 7
 	cv2.line(image_np, person_mark, ball_mark, color, lineThickness)
 	return image_np
-
 
 def iou(box1, box2):
 	#return "intersection over union" of two bounding boxes as float (0,1)
@@ -238,22 +226,6 @@ def filter_selected_categories(image_info_bundel, selected_categories_list):
 		filtered_image_info_bundel[image_path]['image_items_list'] = filtered_image_items_list
 	return filtered_image_info_bundel		
 
-"""
-def write_frame_for_accuracy_test(output_directory_path, frame, image_np, image_info):
-
-	image_file_name = "frame_%d.JPEG" % frame 
-
-	for item in image_info:
-
-		#test coors acuracy
-		(left, right, top, bottom) = item['box']
-		cv2.rectangle(image_np,(left,top),(right,bottom),(0,255,0),3)
-
-	#write
-	output_file = os.path.join(output_directory_path, image_file_name)
-  cv2.imwrite(output_file, image_np)
- """
-
 #saving image_evaluator evaluations
 def save_image_directory_evaluations(image_directory_dirpath, image_boolean_bundel_filepath, image_info_bundel_filepath, model_list, bool_rule):
 
@@ -300,7 +272,6 @@ def get_frame_path_dict(video_frames_dirpath):
 
 	return dict(frame_path_dict)
 
-
 # return minimum and maximum frame number for frame path dict as well as continous boolean value
 def min_max_frames(frame_path_dict):
 	frames, paths = zip(*frame_path_dict.items())
@@ -309,17 +280,6 @@ def min_max_frames(frame_path_dict):
 	continuous = set(range(min_frame,max_frame+1)) == set(frames)
 
 	return min_frame, max_frame, continuous 
-
-
-"""
-def get_output_frame_path_dict(input_frame_path_dict, output_frames_directory):
-
-	output_frame_path_dict = {}
-	for frame, path in input_frame_path_dict.items():
-		new_path = os.path.join(output_frames_directory, os.path.basename(path))
-		output_frame_path_dict[frame] = new_path
-	return output_frame_path_dict
-"""
 
 def frame_directory_to_video(input_frames_directory, output_video_file):
 
@@ -335,41 +295,9 @@ def frame_directory_to_video(input_frames_directory, output_video_file):
 	else:
 		logger.error("Video Frames Directory %s Not continuous")
 
-
-#
-#	apply fuction for image info history (up until frame of specified attribute)
-#
-
-# use addWeighted instead
-"""
-#def get_history(image_info):
-def apply_function_to_history(frame_function, frame, input_frame_path_dict, image_info_bundel, fade=False):
-	# get minimum and maximum frame indexes
-	min_frame, max_frame, continuous = min_max_frames(input_frame_path_dict)
-
-	# apply to each frame starting from first
-	if continuous:
-		frame_path = input_frame_path_dict[min_frame]
-		image_np = cv2.imread(frame_path)	#read image
-		frame_path = input_frame_path_dict[frame]
-		image_info = image_info_bundel[frame_path]
-		image_np = frame_function(image_np, image_info, blackout=True)
-		for frame in range(min_frame+1, frame+1):
-
-			frame_path = input_frame_path_dict[frame]
-			image_info = image_info_bundel[frame_path]
-			image_np = frame_function(image_np, image_info, blackout=False)
-
-		return image_np
-
-	else:
-		logger.error("not continuous")
-"""
-
 #
 # pure boundary box image (highscore person and ball in image info)
 #
-
 def pure_boundary_box_frame(frame_image, image_info):
 
 	#load a frame for size and create black image
@@ -382,19 +310,17 @@ def pure_boundary_box_frame(frame_image, image_info):
 	# draw boxes (filled)
 	if person_box is not None:
 		(left, right, top, bottom) = person_box
-		global dodgerblue
 		cv2.rectangle( rgb_blank_image, (left, top), (right, bottom), color=(255,50,50), thickness=-1, lineType=8 )
 
 	if ball_box is not None:
 		(left, right, top, bottom) = ball_box
-		cv2.rectangle( rgb_blank_image, (left, top), (right, bottom), color=dodgerblue, thickness=-1, lineType=8 )
+		cv2.rectangle( rgb_blank_image, (left, top), (right, bottom), color=(30,144,255), thickness=-1, lineType=8 )
 
 	return rgb_blank_image
 
 #
 # stabalize to person mark, scale to ball box (highscore person and ball in image info)
 #
-
 def stabalize_to_person_mark_frame(frame_image, image_info):
 
 	#load a frame for size and create black image
@@ -482,7 +408,6 @@ def stabalize_to_person_mark_frame(frame_image, image_info):
 
 # run frame cycle and execute function at each step passing current frame path to function, and possibly more
 # cycle function should return image after each run
-
 # output frame_path_dict should be equivalent except to output directory
 def frame_cycle(image_info_bundel, input_frame_path_dict, output_frames_directory, output_video_file, cycle_function, apply_history=False):
 	# get minimum and maximum frame indexes
@@ -519,7 +444,6 @@ def frame_cycle(image_info_bundel, input_frame_path_dict, output_frames_director
 	else:
 		logger.error("not continuous")
 
-
 # source: https://stackoverflow.com/questions/7352684/how-to-find-the-groups-of-consecutive-elements-from-an-array-in-numpy
 def group_consecutives(vals, step=1):
 	"""Return list of consecutive lists of numbers from vals (number list)."""
@@ -545,7 +469,6 @@ def group_consecutives_by_column(matrix, column, step=1):
 		stop = np.argwhere(matrix[:,column] == run[-1])[0,0] + 1
 		run_range_indices.append([start,stop])
 
-
 	#split matrix into segments (smaller matrices)
 	split_matrices = []
 	for run_range in run_range_indices:
@@ -555,12 +478,8 @@ def group_consecutives_by_column(matrix, column, step=1):
 	
 	return split_matrices
 
-
-def squared_error(ys_orig,ys_line):
-	return sum((ys_line - ys_orig) * (ys_line - ys_orig))
-
-
-# 												ball collected data points matrix (ball_cdpm)
+#
+# 							ball collected data points matrix (ball_cdpm)
 #
 # columns: frame, x, y, ball state / iou bool
 #
@@ -615,6 +534,11 @@ def get_ball_cdpm( ball_cdpm_enum, input_frame_path_dict, image_info_bundel):
 		# return matrix
 		return ball_cdpm
 
+#
+#
+#											Main
+#
+#
 
 if __name__ == '__main__':
 
@@ -622,7 +546,7 @@ if __name__ == '__main__':
 	# Initial Evaluation
 	#
 
-	for i in range(16,17):
+	for i in range(2,3):
 
 		print ("video %d" % i)
 
@@ -648,10 +572,18 @@ if __name__ == '__main__':
 		#bool rule - any basketball or person above an accuracy score of 40.0
 		bool_rule = "any('basketball', 40.0) or any('person', 40.0)"
 
-		#save to files for quick access
+		#
+		# 	  evaluate frame directory
+		#				and
+		#	save to files for quick access
+		#
+
 		#save_image_directory_evaluations(video_frames_dirpath, image_boolean_bundel_filepath, image_info_bundel_filepath, [BASKETBALL_MODEL, PERSON_MODEL], bool_rule)
 		#save_image_directory_evaluations(video_frames_dirpath, image_boolean_bundel_filepath, image_info_bundel_filepath, [BASKETBALL_PERSON_MODEL], bool_rule)
 
+		#
+		#	load previously evaluated frames
+		#
 
 		#load saved image_info_bundel
 		image_info_bundel = load_image_info_bundel(image_info_bundel_filepath)
@@ -665,7 +597,6 @@ if __name__ == '__main__':
 		input_frame_path_dict = get_frame_path_dict(video_frames_dirpath)
 
 
-
 		#
 		#	Call function for frame cycle
 		#
@@ -675,17 +606,10 @@ if __name__ == '__main__':
 		#frame_cycle(image_info_bundel, input_frame_path_dict, output_frames_directory, output_video_file, stabalize_to_person_mark_frame)
 
 
-
 		#
-		# 	Extract Ball Trajectory Formula
-		#
-
-
-		#
+		# 	Find Ball Trajectory Formula
 		#	Mock 1: Assertions: Stable video, 1 person, 1 ball
-		#
 
-		#
 		#
 		#	Build ball data points matrix  (ball_cdpm)
 		#													columns: frame, ball mark x, ball mark y, ball state
@@ -703,18 +627,33 @@ if __name__ == '__main__':
 
 		ball_cdpm = get_ball_cdpm(ball_cdpm_enum, input_frame_path_dict, image_info_bundel)
 
+
+		#
+		#	Plot ball data points matrix  (ball_cdpm)
+		#
+		#		- 2d or 3d
+		#		- colored on ball state (held/free ... no data points are dropped)
+		#
+
+		# Write frames
+		WRITE_FRAMES = False
+
+		# Write Video
+		WRITE_VIDEO = False
+
+		# display plot or show regression segmentation, NOT both
+		SHOW_PLOT = False
+		SHOW_REGRESSION_SEGMENTATION = True
+		SHOW_REGRESSION_SEGMENTATION_Y = True # default show x calculation
+
 		# plotting in 3D
-		plot_3d = False
-		from mpl_toolkits import mplot3d
+		PLOT_3D = False
 
-		#remove no data datapoints
-		cleaned_ball_cdpm = ball_cdpm[ball_cdpm[:, ball_cdpm_enum['ball mark x column']] != ball_cdpm_enum['no data'], :] 	# extract all rows with their is data 
-		frames, xs, ys, ball_states = cleaned_ball_cdpm.T
+		# cut off regression formula trajectories (set minimum and maximum x and y values from min and maxs of actual datapoints observed)
+		TRIM_PLOT = False
 
-		# tmp make negitive to compensate for stupid image y coordinates
-		neg = lambda t: t*(-1)
-		vfunc = np.vectorize(neg)
-		ys = vfunc(ys)
+		# flip y values to compensate for wierdo image y coordinates
+		INVERT_Y_VALUES = True
 
 		# ball state enumn 
 		ball_state_enum = {
@@ -722,169 +661,190 @@ if __name__ == '__main__':
 			'free ball' : 1,
 			'held ball' : 0
 		}
-		
-		# inverse map
-		inv_ball_state_enum = {
-			v: k for k, v in ball_state_enum.items()
-		}
 
-		# change color for ball state
+		# color/ball state map
 		ball_state_colors_enum = {
 			'free ball' : 'g',
 			'held ball' : 'r'
 		}
 
+		#remove no data elements
+		cleaned_ball_cdpm = ball_cdpm[ball_cdpm[:, ball_cdpm_enum['ball mark x column']] != ball_cdpm_enum['no data'], :] 	# extract all rows where there is data 
+		frames, xs, ys, ball_states = cleaned_ball_cdpm.T
+
+		# invert y values
+		if INVERT_Y_VALUES:
+			neg = lambda t: t*(-1)
+			invert_array = np.vectorize(neg)
+			ys = invert_array(ys)
+
+		# change color for ball state
+		inv_ball_state_enum = { v: k for k, v in ball_state_enum.items()}	# inverse map of ball state enum
 		ball_state_colors = [] 
 		for bs in ball_states:
 			i_state = inv_ball_state_enum[bs]
 			color = ball_state_colors_enum[i_state]
 			ball_state_colors.append(color)
-
-		fig = plt.figure()
-
-		if plot_3d == True:
-			ax = plt.axes(projection='3d')
-			ax.scatter3D(xs, ys, frames, c=ball_state_colors, cmap='Greens')
-			ax.set_xlabel('Xs')
-			ax.set_ylabel('Ys')
-			ax.set_zlabel('frames')
-		else:
-			for i in range(len(xs)):
-				plt.scatter(xs[i], ys[i], color=ball_state_colors[i])
-				plt.xlabel('Xs', fontsize=18)
-				plt.ylabel('Ys', fontsize=18)
-
-		#
-		# try regression prediction
-		#
-
-		# identify likley tranjectory frame ranges and then refine for [ min r value ]
-		#		1. min and max of frame range adjustment 			# for [ min r value ]
-		#		2. matrix transformation diffrent axis  			# for [ min r value ]	
-
-		# first guess iteration of trajectory ranges, ranges are cut at frames with ball state column value == 'held ball'
-		possible_trajectory_data_points = ball_cdpm[ball_cdpm[:, ball_cdpm_enum['ball state column']] != ball_cdpm_enum['held ball'], :] 	# extract all rows with the ball state column does not equal held ball
-		possible_trajectory_matrices = group_consecutives_by_column(possible_trajectory_data_points, ball_cdpm_enum['frame column'])			# split into seperate matricies for ranges
-
-		#for each matrix find regression formulas
-		p_xyzs = []
-		for i in range(len(possible_trajectory_matrices)):
-			trajectory_points = possible_trajectory_matrices[i]
-
-			#remove missing datapoints
-			cleaned_trajectory_points = trajectory_points[trajectory_points[:, ball_cdpm_enum['ball mark x column']] != ball_cdpm_enum['no data'], :] 	# extract all rows with their is data 
-			cframes, cxs, cys, cstate = cleaned_trajectory_points.T
-
-			#if length of possible trajectory is more than 1 data point
-			if len(cframes) > 1:
-
-				#total frame range for plotting regreesion lines - so path is not line segments
-				#total_frame_range = np.linspace(frames[0], frames[-1], frames[-1]- frames[0])
-				trajectory_total_frame_range = np.linspace(cframes[0], cframes[-1], cframes[-1] - cframes[0])	#trajectory total frame range
-
-				# try plots removing trailing datapoints
-				old_frames, old_xs, old_ys, old_trajectory_total_frame_range = cframes, cxs, cys, trajectory_total_frame_range
-
-				# always keep two datapoints
-				for n in range(len(cframes)-2, 0, -1):
-					cframes, cxs, cys, trajectory_total_frame_range = old_frames, old_xs, old_ys, old_trajectory_total_frame_range  # reset
-
-					#cut off n last frames
-					cframes = cframes[:-n]
-					trajectory_total_frame_range[:-n]
-					cxs = cxs[:-n]
-					cys = cys[:-n]
-
-					#xs - degreen 1 regression fit (cleaned xs - cxs)
-					p1 = np.polyfit(cframes, cxs, 1)
-					fit_xs = np.polyval(p1, trajectory_total_frame_range)
-
-					"""
-					# tmp make negitive to compensate for stupid image y coordinates
-					neg = lambda t: t*(-1)
-					vfunc = np.vectorize(neg)
-					cys = vfunc(cys)
-					"""
-
-					#ys - degreen 2 regression fit (cleaned ys - cys)
-					p2 = np.polyfit(cframes, cys, 2)
-					fit_ys = np.polyval(p2, trajectory_total_frame_range)
-
-					#add trajectory path
-					p_xyzs.append((fit_xs, fit_ys, trajectory_total_frame_range, n))
+	
+		if SHOW_PLOT:
+			assert not SHOW_REGRESSION_SEGMENTATION
+			# add plots
+			fig = plt.figure()
+			if PLOT_3D == True:
+				ax = plt.axes(projection='3d')
+				ax.scatter3D(xs, ys, frames, c=ball_state_colors, cmap='Greens')
+				ax.set_xlabel('Xs')
+				ax.set_ylabel('Ys')
+				ax.set_zlabel('frames')
+			else:
+				for i in range(len(xs)):
+					plt.scatter(xs[i], ys[i], color=ball_state_colors[i])
+					plt.xlabel('Xs', fontsize=18)
+					plt.ylabel('Ys', fontsize=18)
 		
+		
+		#
+		# Break ball data points matrix into multiple submatrices (free_ball_cbdm's) where ball is free
+		#				(break around held ball datapoints)
+		#
 
-		#n_value is number of dropped datapoints
-		#random color
-		if plot_3d == True:
-			for predicted_trajectory_points in p_xyzs:
-				pxs, pys, pzs, n_value = predicted_trajectory_points
-				ax.plot3D(pxs, pys, pzs, c=np.random.rand(3,1), linewidth=1, label=n_value)
-		else:
-			for predicted_trajectory_points in p_xyzs:
-				pxs, pys, pzs, n_value = predicted_trajectory_points
-				plt.plot(pxs, pys, c=np.random.rand(3,1), label=n_value, markersize=1)	
+		# cut ball_cdpm at frames with ball state column value == 'held ball', leaving only free ball datapoints in an array of matrices
+		free_ball_cbdm_array = ball_cdpm[ball_cdpm[:, ball_cdpm_enum['ball state column']] != ball_cdpm_enum['held ball'], :] 	# extract all rows with the ball state column does not equal held ball
+		free_ball_cbdm_array = group_consecutives_by_column(free_ball_cbdm_array, ball_cdpm_enum['frame column'])						# split into seperate matrices for ranges
+
+		# 
+		#	find regression formula (ball trajectory formula) for each free_ball_cbdm (sub matrix)
+		#
+
+		shot_regression_formulas = []	# [[regression_shot_xs, regression_shot_ys, shot_frames], ...]
+
+		for i in range(len(free_ball_cbdm_array)):
+			possible_trajectory_coordinates = free_ball_cbdm_array[i]		# 'possible' ball trajectory coordinates, ranges without held ball states tagged by model
+
+			# extract 'known' ball trajectory coordinates, tagged by model
+			#remove missing datapoints 
+			known_trajectory_points = possible_trajectory_coordinates[possible_trajectory_coordinates[:, ball_cdpm_enum['ball mark x column']] != ball_cdpm_enum['no data'], :] 	# extract all rows where there is data 
+			kframes, kxs, kys, kstate = known_trajectory_points.T
+
+			#enure known ball trajectory has more than 1 data point
+			if len(kframes) > 1:
+
+				#total frame range for plotting regresion lines - so path is not line segments
+				trajectory_total_frame_range = np.linspace(kframes[0], kframes[-1], kframes[-1] - kframes[0])
+
+				#
+				#						peicewise linear regression
+				#
+				#	Apply peicewise linear regression to x values.
+				#	x values should change linearly if ball is in free flight (ignoring air resistance).
+				#	Use peicewise linear regression to find the point at which the free flying ball hits another object/changes its path
+				#	Find point of intersection for seperate regression lines to find final frame of shot ball trajectory
+				#
+
+				#peicewise model
+				model = piecewise(kframes, kxs)
+				start_frame, stop_frame, coeffs = model.segments[0]		# find start and stopping frame (start_frame, stop_frame) from first line segment, and line formula
+				shot_frame_range = [start_frame, stop_frame]
+
+				shot_frames = np.linspace(start_frame, stop_frame, stop_frame-start_frame)	# final
+				regression_shot_xs = np.polyval(list(coeffs)[::-1], shot_frames)			# final
+
+
+				#
+				# Find ys - degree 2 regression fit capped at shot frame range above
+				#
+
+				# remove y frames from trajectory not covered by shot frame
+				cap_index = np.where(kframes==stop_frame)[0][0]
+				capped_ys = kys[:cap_index]
+				capped_xs = kxs[:cap_index]
+				capped_frames = kframes[:cap_index]
+
+
+				# invert y values
+				if INVERT_Y_VALUES:
+					neg = lambda t: t*(-1)
+					invert_array = np.vectorize(neg)
+					capped_ys = invert_array(capped_ys)
+
+				# find y values degree 2 regression fit
+				p2 = np.polyfit(capped_frames, capped_ys, 2)
+				regression_shot_ys = np.polyval(p2, shot_frames)							# final
+			
+				if SHOW_PLOT:
+					assert not SHOW_REGRESSION_SEGMENTATION
+					# Add to plot
+					if PLOT_3D == True:
+						ax.plot3D(regression_shot_xs, regression_shot_ys, shot_frames, c=np.random.rand(3,1), linewidth=1)
+					else:
+						plt.plot(regression_shot_xs, regression_shot_ys, c=np.random.rand(3,1), markersize=1)
+
+				# Add to shot_regression_formulas
+				shot_regression_formulas.append([regression_shot_xs, regression_shot_ys, shot_frames])
+
+				# invert regression y values
+				if INVERT_Y_VALUES:
+					neg = lambda t: t*(-1)
+					invert_array = np.vectorize(neg)
+					regression_shot_ys = invert_array(regression_shot_ys)
+
+				if SHOW_REGRESSION_SEGMENTATION:
+					assert not SHOW_PLOT
+					if SHOW_REGRESSION_SEGMENTATION_Y:
+						#plt.scatter(capped_frames, capped_ys)			
+						plt.plot(shot_frames, regression_shot_ys)
+						plt.scatter(kframes, kys)
+					else:
+						#plt.scatter(capped_frames, capped_xs)
+						plt.plot(shot_frames, regression_shot_xs)
+						plt.scatter(kframes, kxs)
+				#plt.scatter(capped_frames, capped_ys)			
+				#plt.plot(shot_frames, regression_shot_ys)
+				#plt.scatter(kframes, kys)
 
 		# set minimum and maximum x and y values from min and maxs of actual datapoints observed
-		#axes = plt.gca()
-		#axes.set_xlim([xs.min(),xs.max()])
-		#axes.set_ylim([ys.min(),ys.max()])
+		# cut off regression formula trajectories
+		if TRIM_PLOT:
+			axes = plt.gca()
+			axes.set_xlim([xs.min(),xs.max()])
+			axes.set_ylim([ys.min(),ys.max()])
 
 		#display
-		#plt.legend()
-		#plt.legend(loc=9, bbox_to_anchor=(0.5, -0.1))
-		#plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
-		#plt.show()
-		#fig.savefig('samplefigure', bbox_inches='tight')
+		plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
 
+		if SHOW_PLOT or SHOW_REGRESSION_SEGMENTATION:
+			plt.show()
+
+		#if SAVE_PLOT:
+		#fig.savefig('samplefigure', bbox_inches='tight')
 
 		# drawing predicted lines onto actual video frames from 2d plots
 		# get minimum and maximum frame indexes
-		min_frame, max_frame, continuous = min_max_frames(input_frame_path_dict)
-		assert continuous
-		for frame in range(min_frame,max_frame+1) :
 
-			#load
-			frame_path = input_frame_path_dict[frame]
-			frame_image = cv2.imread(frame_path)	#read image
-			frame_image = cv2.cvtColor(frame_image, cv2.COLOR_BGR2RGB)
+		if WRITE_FRAMES or WRITE_VIDEO:
+			min_frame, max_frame, continuous = min_max_frames(input_frame_path_dict)
+			assert continuous
+			for frame in range(min_frame,max_frame+1) :
 
-			#for path_prediction in p_xyzs:
-			#	#draw
-			#	pxs, pys, pzs, n_value = path_prediction
-			#	points = list(zip(pxs,pys))
-			#	cv2.polylines(frame_image,  np.int32([points]), False, (0,255,0), thickness=5) 
-			#draw
-			pxs, pys, pzs, n_value = p_xyzs[2]
-			points = list(zip(pxs,pys))
-			cv2.polylines(frame_image,  np.int32([points]), False, (0,255,0), thickness=5) 
+				#load
+				frame_path = input_frame_path_dict[frame]
+				frame_image = cv2.imread(frame_path)	#read image
+				frame_image = cv2.cvtColor(frame_image, cv2.COLOR_BGR2RGB)
 
-			#display
-			#frame_image = Image.fromarray(frame_image, 'RGB')
-			#frame_image.show()
-			#frame_image.save(PATHTOSAVE)
+				for srf in shot_regression_formulas:
+					#draw
+					srf_xs, srf_ys, srf_frames = srf
+					points = list(zip(srf_xs, srf_ys))
+					cv2.polylines(frame_image,  np.int32([points]), False, (0,255,0), thickness=5) 
 
-			# write images
-			write_frame_for_accuracy_test(output_frames_directory, frame, frame_image)
+				#display
+				#frame_image = Image.fromarray(frame_image, 'RGB')
+				#frame_image.show()
+				#frame_image.save(PATHTOSAVE)
+
+				# write frames
+				write_frame_for_accuracy_test(output_frames_directory, frame, frame_image)
 
 		# write video
-		frame_directory_to_video(output_frames_directory, output_video_file)
-
-#
-# 	Extract Ball Trajectory Formula
-#
-
-
-#
-#	Mock 1: Assertions: Stable video, 1 person, 1 ball
-#
-
-#
-#	collected data points matrix : cdpm
-#
-
-#
-#	general data points matrix : frame, x1, y1, x2, y2
-#
-
-
+		if WRITE_VIDEO:
+			frame_directory_to_video(output_frames_directory, output_video_file)
