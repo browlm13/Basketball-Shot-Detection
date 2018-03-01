@@ -60,7 +60,13 @@ def write_frame_for_accuracy_test(output_directory_path, frame, image_np):
 
 	image_file_name = "frame_%d.JPEG" % frame 
 	output_file = os.path.join(output_directory_path, image_file_name)
-	cv2.imwrite(output_file, image_np)
+	
+	#cv2.imwrite(output_file, image_np)	#BGR color
+
+	#fix color
+	image = Image.fromarray(image_np, 'RGB')
+	image.save(output_file)
+	logger.info("wrote %s to \n\t%s" % (image_file_name, output_file))
 
 
 #list of 4 coordanates for box
@@ -480,13 +486,13 @@ def stabalize_to_person_mark_frame(frame_image, image_info):
 # output frame_path_dict should be equivalent except to output directory
 def frame_cycle(image_info_bundel, input_frame_path_dict, output_frames_directory, output_video_file, cycle_function, apply_history=False):
 	# get minimum and maximum frame indexes
-	min_frame, max_frame, continuous = min_max_frames(frame_path_dict)
+	min_frame, max_frame, continuous = min_max_frames(input_frame_path_dict)
 
 	# frame cycle
 	if continuous:
 	
 		for frame in range(min_frame, max_frame + 1):
-			frame_path = frame_path_dict[frame]
+			frame_path = input_frame_path_dict[frame]
 			image_info = image_info_bundel[frame_path]
 
 			frame_image = cv2.imread(frame_path)	#read image
@@ -696,9 +702,9 @@ if __name__ == '__main__':
 		}
 
 		ball_cdpm = get_ball_cdpm(ball_cdpm_enum, input_frame_path_dict, image_info_bundel)
-		
 
-		# try plotting in 3D
+		# plotting in 3D
+		plot_3d = False
 		from mpl_toolkits import mplot3d
 
 		#remove no data datapoints
@@ -735,12 +741,18 @@ if __name__ == '__main__':
 			ball_state_colors.append(color)
 
 		fig = plt.figure()
-		ax = plt.axes(projection='3d')
-		ax.scatter3D(xs, ys, frames, c=ball_state_colors, cmap='Greens')
-		ax.set_xlabel('Xs')
-		ax.set_ylabel('Ys')
-		ax.set_zlabel('frames')
 
+		if plot_3d == True:
+			ax = plt.axes(projection='3d')
+			ax.scatter3D(xs, ys, frames, c=ball_state_colors, cmap='Greens')
+			ax.set_xlabel('Xs')
+			ax.set_ylabel('Ys')
+			ax.set_zlabel('frames')
+		else:
+			for i in range(len(xs)):
+				plt.scatter(xs[i], ys[i], color=ball_state_colors[i])
+				plt.xlabel('Xs', fontsize=18)
+				plt.ylabel('Ys', fontsize=18)
 
 		#
 		# try regression prediction
@@ -787,10 +799,12 @@ if __name__ == '__main__':
 					p1 = np.polyfit(cframes, cxs, 1)
 					fit_xs = np.polyval(p1, trajectory_total_frame_range)
 
+					"""
 					# tmp make negitive to compensate for stupid image y coordinates
 					neg = lambda t: t*(-1)
 					vfunc = np.vectorize(neg)
 					cys = vfunc(cys)
+					"""
 
 					#ys - degreen 2 regression fit (cleaned ys - cys)
 					p2 = np.polyfit(cframes, cys, 2)
@@ -799,20 +813,62 @@ if __name__ == '__main__':
 					#add trajectory path
 					p_xyzs.append((fit_xs, fit_ys, trajectory_total_frame_range, n))
 		
+
 		#n_value is number of dropped datapoints
 		#random color
-		for predicted_trajectory_points in p_xyzs:
-			pxs, pys, pzs, n_value = predicted_trajectory_points
-			ax.plot3D(pxs, pys, pzs, c=np.random.rand(3,1), linewidth=1, label=n_value)
+		if plot_3d == True:
+			for predicted_trajectory_points in p_xyzs:
+				pxs, pys, pzs, n_value = predicted_trajectory_points
+				ax.plot3D(pxs, pys, pzs, c=np.random.rand(3,1), linewidth=1, label=n_value)
+		else:
+			for predicted_trajectory_points in p_xyzs:
+				pxs, pys, pzs, n_value = predicted_trajectory_points
+				plt.plot(pxs, pys, c=np.random.rand(3,1), label=n_value, markersize=1)	
 
 		# set minimum and maximum x and y values from min and maxs of actual datapoints observed
-		axes = plt.gca()
-		axes.set_xlim([xs.min(),xs.max()])
-		axes.set_ylim([ys.min(),ys.max()])
+		#axes = plt.gca()
+		#axes.set_xlim([xs.min(),xs.max()])
+		#axes.set_ylim([ys.min(),ys.max()])
 
 		#display
-		plt.legend()
-		plt.show()
+		#plt.legend()
+		#plt.legend(loc=9, bbox_to_anchor=(0.5, -0.1))
+		#plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+		#plt.show()
+		#fig.savefig('samplefigure', bbox_inches='tight')
+
+
+		# drawing predicted lines onto actual video frames from 2d plots
+		# get minimum and maximum frame indexes
+		min_frame, max_frame, continuous = min_max_frames(input_frame_path_dict)
+		assert continuous
+		for frame in range(min_frame,max_frame+1) :
+
+			#load
+			frame_path = input_frame_path_dict[frame]
+			frame_image = cv2.imread(frame_path)	#read image
+			frame_image = cv2.cvtColor(frame_image, cv2.COLOR_BGR2RGB)
+
+			#for path_prediction in p_xyzs:
+			#	#draw
+			#	pxs, pys, pzs, n_value = path_prediction
+			#	points = list(zip(pxs,pys))
+			#	cv2.polylines(frame_image,  np.int32([points]), False, (0,255,0), thickness=5) 
+			#draw
+			pxs, pys, pzs, n_value = p_xyzs[2]
+			points = list(zip(pxs,pys))
+			cv2.polylines(frame_image,  np.int32([points]), False, (0,255,0), thickness=5) 
+
+			#display
+			#frame_image = Image.fromarray(frame_image, 'RGB')
+			#frame_image.show()
+			#frame_image.save(PATHTOSAVE)
+
+			# write images
+			write_frame_for_accuracy_test(output_frames_directory, frame, frame_image)
+
+		# write video
+		frame_directory_to_video(output_frames_directory, output_video_file)
 
 #
 # 	Extract Ball Trajectory Formula
