@@ -1,5 +1,11 @@
 #!/usr/bin/env python
 
+"""
+
+	- detect if video is stable
+	- display velocity
+"""
+
 import logging
 import os
 import glob
@@ -24,6 +30,9 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 #	note: #(left, right, top, bottom) = box
+
+def camera_movement_between_frames(frame_image1, frame_image2): pass
+def is_video_stable(input_frames_directory): pass
 
 #
 # Test accuracy by writing new images
@@ -57,12 +66,14 @@ def write_frame_for_accuracy_test(output_directory_path, frame, image_np):
 	image_file_name = "frame_%d.JPEG" % frame 
 	output_file = os.path.join(output_directory_path, image_file_name)
 	
-	#cv2.imwrite(output_file, image_np)	#BGR color
+	cv2.imwrite(output_file, image_np)	#BGR color
 
+	"""
 	#fix color
 	image = Image.fromarray(image_np, 'RGB')
 	image.save(output_file)
 	logger.info("wrote %s to \n\t%s" % (image_file_name, output_file))
+	"""
 
 #list of 4 coordanates for box
 def draw_box_image_np(image_np, box, color=(0,255,0)):
@@ -144,9 +155,19 @@ def get_angle_between_points(mark1, mark2):
 	radians = math.atan2(y1-y2,x1-x2)
 	return radians
 
+def get_ball_radius(ball_box, integer=True):
+	(left, right, top, bottom) = ball_box
+	xwidth = (right - left)/2
+	ywidth = (bottom - top)/2
+	radius = (xwidth + ywidth)/2
+
+	if integer: return int(radius)
+	return radius
+"""
 def get_ball_radius(ball_box):
 	(left, right, top, bottom) = ball_box
 	return int((right - left)/2)
+"""
 
 def get_ball_outside_mark(person_box, ball_box):
 	# mark on circumfrence of ball pointing twords person mark
@@ -370,39 +391,69 @@ def stabalize_to_person_mark_frame(frame_image, image_info):
 			#draw_circle(rgb_blank_image, new_ball_mark, radius=ball_radius)
 
 			#old  drawing
-			draw_box_image_np(rgb_blank_image, person_box)
-			draw_circle(rgb_blank_image, (px, py))
-			draw_box_image_np(rgb_blank_image, ball_box) #ball box
-			draw_circle(rgb_blank_image, (bx, by))	#ball circle
-			draw_person_ball_connector(rgb_blank_image, (px,py), (bx,by)) #draw connectors
+			#draw_box_image_np(rgb_blank_image, person_box)
+			#draw_circle(rgb_blank_image, (px, py))
+			#draw_box_image_np(rgb_blank_image, ball_box) #ball box
+			#draw_circle(rgb_blank_image, (bx, by))	#ball circle
+			#draw_person_ball_connector(rgb_blank_image, (px,py), (bx,by)) #draw connectors
 
 
 			#iou overlap
 			if iou(person_box, ball_box) > 0:
 
-				#new coordinate drawings
+				#
+				#old coordinate drawings
+				#
 
 				#ball
-				draw_circle(rgb_blank_image, new_ball_mark, color=(0,255,0))	#mark
-				draw_circle(rgb_blank_image, new_ball_mark, radius=ball_radius, color=(0,255,0), thickness=5) #draw ball
-				draw_person_ball_connector(rgb_blank_image, center, new_ball_mark, color=(0,255,0)) # connector
+				draw_circle(rgb_blank_image, (bx, by), color=(0,0,255))	#mark
+				draw_circle(rgb_blank_image, (bx, by), radius=ball_radius, color=(0,0,255), thickness=5) #draw ball
+				draw_person_ball_connector(rgb_blank_image, (px, py), (bx, by), color=(0,0,255)) # connector
 
 				#person
-				draw_circle(rgb_blank_image, center, color=(0,255,0))
-				draw_box_image_np(rgb_blank_image, new_person_box, color=(0,255,0))
+				draw_circle(rgb_blank_image, (px, py), color=(0,0,255))
+				#draw_box_image_np(rgb_blank_image, person_box, color=(0,0,255))
+
+				#
+				#new coordinate drawings
+				#
+
+				#ball
+				#draw_circle(rgb_blank_image, new_ball_mark, color=(0,255,0))	#mark
+				#draw_circle(rgb_blank_image, new_ball_mark, radius=ball_radius, color=(0,255,0), thickness=5) #draw ball
+				#draw_person_ball_connector(rgb_blank_image, center, new_ball_mark, color=(0,255,0)) # connector
+
+				#person
+				#draw_circle(rgb_blank_image, center, color=(0,255,0))
+				#draw_box_image_np(rgb_blank_image, new_person_box, color=(0,255,0))
 
 			else:
 
-				#new coordinate drawings
+				#
+				#old coordinate drawings
+				#
 
 				#ball
-				draw_circle(rgb_blank_image, new_ball_mark, color=(0,0,255))	#mark
-				draw_circle(rgb_blank_image, new_ball_mark, radius=ball_radius, color=(0,0,255)) #ball
-				draw_person_ball_connector(rgb_blank_image, center, new_ball_mark, color=(0,0,255)) #connector
+				draw_circle(rgb_blank_image, (bx, by), color=(0,0,255))	#mark
+				draw_circle(rgb_blank_image, (bx, by), radius=ball_radius, color=(0,0,255), thickness=5) #draw ball
+				#draw_person_ball_connector(rgb_blank_image, (px, py), (bx, by), color=(0,255,0)) # connector
 
 				#person
-				draw_circle(rgb_blank_image, center, color=(0,0,255))
-				draw_box_image_np(rgb_blank_image, new_person_box, color=(0,0,255))
+				#draw_circle(rgb_blank_image, (px, py), color=(0,255,0))
+				#draw_box_image_np(rgb_blank_image, person_box, color=(0,255,0))
+
+				#
+				#new coordinate drawings
+				#
+
+				#ball
+				#draw_circle(rgb_blank_image, new_ball_mark, color=(0,0,255))	#mark
+				#draw_circle(rgb_blank_image, new_ball_mark, radius=ball_radius, color=(0,0,255)) #ball
+				#draw_person_ball_connector(rgb_blank_image, center, new_ball_mark, color=(0,0,255)) #connector
+
+				#person
+				#draw_circle(rgb_blank_image, center, color=(0,0,255))
+				#draw_box_image_np(rgb_blank_image, new_person_box, color=(0,0,255))
 
 	return rgb_blank_image
 
@@ -438,7 +489,7 @@ def frame_cycle(image_info_bundel, input_frame_path_dict, output_frames_director
 					image_np = cv2.addWeighted(image_np,alpha,next_image_np,beta,gamma)
 
 			# write images
-			write_frame_for_accuracy_test(output_frames_directory, frame, image_np)
+			#write_frame_for_accuracy_test(output_frames_directory, frame, image_np)
 
 		# write video
 		frame_directory_to_video(output_frames_directory, output_video_file)
@@ -558,7 +609,7 @@ if __name__ == '__main__':
 
 		#output images and video directories for checking
 		output_frames_directory = "/Users/ljbrown/Desktop/StatGeek/object_detection/%s/output_images/output_frames_shot_%s" % (model_collection_name,i)
-		output_video_file = '%s/output_video/shot_%d_prediction_trajectory.mp4' % (model_collection_name,i)
+		output_video_file = '%s/output_video/shot_%d_detection.mp4' % (model_collection_name,i)
 
 		#image_boolean_bundel and image_info_bundel file paths for quick access
 		image_boolean_bundel_filepath = "/Users/ljbrown/Desktop/StatGeek/object_detection/%s/image_evaluator_output/shot_%s_image_boolean_bundel.json" % (model_collection_name,i)
@@ -602,9 +653,53 @@ if __name__ == '__main__':
 		#	Call function for frame cycle
 		#
 
-		#output_video_file = 'output_video/shot_%d_pure_block_history.mp4' % i
+		#output_video_file = 'output_video/shot_%d_detection.mp4' % i
 		#frame_cycle(image_info_bundel, input_frame_path_dict, output_frames_directory, output_video_file, pure_boundary_box_frame, apply_history=True)
 		#frame_cycle(image_info_bundel, input_frame_path_dict, output_frames_directory, output_video_file, stabalize_to_person_mark_frame)
+
+
+
+		#
+		#	Testing ball size tracking accuracy
+		#
+
+		inv_input_frame_path_dict = { v: k for k, v in input_frame_path_dict.items()}	# inverse map of frame path to frame number
+
+		# get ball radii and assosciated frames
+		ball_boxes = []
+		ball_frames = []
+		for frame_path, frame_info in image_info_bundel.items():
+			ball_box = get_high_score_box(frame_info, 'basketball', must_detect=False)
+			if ball_box is not None:
+				ball_boxes.append(ball_box)
+				ball_frames.append(inv_input_frame_path_dict[frame_path])
+		ball_radii = [get_ball_radius(bb, integer=False) for bb in ball_boxes]
+		
+		# plot
+		#plt.scatter(ball_frames, ball_radii)
+		#plt.xlabel('Frames', fontsize=18)
+		#plt.ylabel('Ball Radius', fontsize=18)
+
+
+		#peicewise regression
+
+		#built in plot
+		plot_data_with_regression(ball_frames, ball_radii)
+		
+		model = piecewise(ball_frames, ball_radii)
+		start_frame, stop_frame, coeffs = model.segments[0]		# find start and stopping frame (start_frame, stop_frame) from first line segment, and line formula
+		
+		ball_frame_range = [start_frame, stop_frame]
+		shot_frames = np.linspace(start_frame, stop_frame, stop_frame-start_frame)	# final
+		regression_ball_radii = np.polyval(list(coeffs)[::-1], ball_frames)			# final
+		
+		# plot
+		#plt.plot(ball_frames, regression_ball_radii, c=np.random.rand(3,1), markersize=1)
+
+		#display and exit
+		#plt.show()
+		sys.exit()
+
 
 
 		#
@@ -637,7 +732,7 @@ if __name__ == '__main__':
 		#
 
 		# std error x value linear regression threshold to apply piecewise linear regression
-		STD_ERROR_THRESHOLD = 0.5
+		STD_ERROR_THRESHOLD = 0.9
 
 		# Write frames
 		WRITE_FRAMES = False
@@ -647,11 +742,15 @@ if __name__ == '__main__':
 
 		# display plot or show regression segmentation, NOT both
 		SHOW_PLOT = False
-		SHOW_REGRESSION_SEGMENTATION = True
+		SHOW_REGRESSION_SEGMENTATION = False
 		SHOW_REGRESSION_SEGMENTATION_Y = False # default show x calculation
 
+		#save plot
+		SAVE_PLOT = False
+		plot_filepath = '~/Desktop/shot_16_plot.png'
+
 		# plotting in 3D
-		PLOT_3D = False
+		PLOT_3D = True
 
 		# cut off regression formula trajectories (set minimum and maximum x and y values from min and maxs of actual datapoints observed)
 		TRIM_PLOT = False
@@ -699,7 +798,7 @@ if __name__ == '__main__':
 				ax.scatter3D(xs, ys, frames, c=ball_state_colors, cmap='Greens')
 				ax.set_xlabel('Xs')
 				ax.set_ylabel('Ys')
-				ax.set_zlabel('frames')
+				#ax.set_zlabel('frames')
 			else:
 				for i in range(len(xs)):
 					plt.scatter(xs[i], ys[i], color=ball_state_colors[i])
@@ -748,6 +847,9 @@ if __name__ == '__main__':
 
 				# test linear regression std error for x values
 				slope, intercept, r_value, p_value, std_err = stats.linregress(kframes, kxs)
+
+				logger.info("\n\nSTD Error for Regression: %s" % std_err)
+
 				start_frame, stop_frame = kframes[0], kframes[-1]
 				shot_frame_range = [start_frame, stop_frame]
 				shot_frames = np.linspace(start_frame, stop_frame, stop_frame-start_frame)
@@ -759,6 +861,8 @@ if __name__ == '__main__':
 
 				# apply peicewise linear regression only if x std error is above threshold
 				if std_err >= STD_ERROR_THRESHOLD:
+
+					logger.info("Applying peicewise regression\n")
 
 					#peicewise model
 					model = piecewise(kframes, kxs)
@@ -834,8 +938,8 @@ if __name__ == '__main__':
 		if SHOW_PLOT or SHOW_REGRESSION_SEGMENTATION:
 			plt.show()
 
-		#if SAVE_PLOT:
-		#fig.savefig('samplefigure', bbox_inches='tight')
+		if SAVE_PLOT:
+			fig.savefig(plot_filepath, bbox_inches='tight')
 
 		# drawing predicted lines onto actual video frames from 2d plots
 		# get minimum and maximum frame indexes
