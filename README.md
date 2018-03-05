@@ -10,5 +10,7 @@
 ![Shot with missing datapoints](shot_2.gif)
 
 ## End of Shot detection 
-### (Exlude Data Points After Ball Hits Objects)
+### (Exclude Data Points After Ball Hits Objects)
 ![Hits net piecewise linear regression](shot_16.gif)
+### (Adjust Trajectories For Shot Angle/Camera Depth)
+![Depth Adjustment](depth_adjustment_shot_16.png)
