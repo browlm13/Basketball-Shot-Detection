@@ -1016,9 +1016,92 @@ def find_ball_regression_formulas(frame_info_bundel, shot_frame_range, adjust_yv
 	# return polynomial coefficents
 	return [pxs, pys]
 
+def find_normalized_ball_regression_formulas(frame_info_bundel, shot_frame_range, adjust_yvalues=True, return_pzs=False):
+	"""
+	:param frames_info_bundel: frames_info_bundel object to extract regression formulas from
+	:param shot_frame_range: frame range to extract regression formulas from
+	:return: normalized regression polynomial coeffiecnts to balls radius in pixels list [pxs,pys]. format pis: [(coeff 0)frame^0, (coeff 1)frame^1, ...] -- (np.polyfit)
+	"""
+	# note cannot handle frame ranges of single value
+
+	# get xs, ys, radiis known datapoints in frame range
+
+	# get known boxes in frame range
+	ball_boxes, frames = zip(*known_boxes_in_frame_range(frame_info_bundel, shot_frame_range, 'basketball'))	#tuples
+	
+	# get known ball marks
+	ball_marks = [get_ball_mark(bb) for bb in ball_boxes]
+
+	#find average x and y values
+	xs, ys = zip(*ball_marks) 	#tuples
+
+	# find ball radii
+	ball_radii = [get_ball_radius(bb, integer=False) for bb in ball_boxes]
+
+	# normalize radii for change only
+	# normalize to first radii
+	normalized_ball_radii = [r/ball_radii[0] for r in ball_radii]
+
+	# zs_distance_change_coeff - 1/normalized ball radii. this represents the balls distance change from its startposition at the origin
+	# greater than 1 is farther away, 2 is twice as far away
+	zs_distance_change_coeff = [1/r for r in normalized_ball_radii]
+
+	# find regression formula then scale to balls distance away
+	pzs_change_coeff = np.polyfit(frames, zs_distance_change_coeff, 1)
+	total_shot_frames = np.linspace(frames[0], frames[-1], frames[-1]-frames[0])
+	#zs_change_coeffs = np.polyval(pzs_change_coeff, total_shot_frames)
+	zs_change_coeffs = np.polyval(pzs_change_coeff, frames)
+	
+	"""
+	# find average distance away
+	# find average radii
+	np_ball_radii = np.array(ball_radii)
+	mean_radius = np_ball_radii.mean()
+	start_mean_radius = (mean_radii + ball_radii[0]*2)/3	# estimate of intial radii, weighted tword start radius
+	
+	# distance estimate from radius
+	# get frame path dict
+	frame_path_dict = frame_info_bundel_to_frame_path_dict(frame_info_bundel)
+	image_height_pixels = load_image_np(frame_path_dict[frames[0]]).shape[0]
+	BALL_TRUE_RADIUS = 
+	
+	#distance_from_radius = lambda r: math.atan(start_mean_radius/image_height_pixels)
+	"""
 
 
+	# ys adjuseted
+	# y_adjusted = y/z_change_coeff_matched_range
+	# 
+	ys_adjusted = [y/zcc for y,zcc in zip(ys, zs_change_coeffs)]
 
+	# find x regression polynomial coeffiecnts
+	#xs - degreen 1 regression fit 
+	pxs = np.polyfit(frames, xs, 1)
+
+	# find y regreesion polynomial coeffiecents - currently do not take into account z corrections
+	#ys - degreen 2 regression fit 
+	pys = np.polyfit(frames, ys, 2)
+
+	if adjust_yvalues:
+		# find pys with z correction
+		pys = np.polyfit(frames, ys_adjusted, 2)
+
+	# normalize xs and ys to change from first datapoint
+	regression_xs = np.polyval(pxs, frames)
+	regression_ys = np.polyval(pys, frames)
+	centered_xs = [x -regression_xs[0] for x in regression_xs]
+	centered_ys = [y -regression_ys[0] for y in regression_ys]
+	normalized_xs = [x/r for x,r in zip(xs, ball_radii)] 	#normalize to ball radius in pixels
+	normalized_ys = [y/r for y,r in zip(ys, ball_radii)] 	#normalize to ball radius in pixels
+	normalized_pxs = np.polyfit(frames, normalized_xs, 1)
+	normalized_pys = np.polyfit(frames, normalized_ys, 2)
+
+	# return normalized polynomial coefficents
+	if return_pzs:
+		normalized_zs = pzs_change_coeff
+		return [normalized_pxs, normalized_pys, normalized_zs]
+	else:
+		return [normalized_pxs, normalized_pys]
 
 # get error of least squares fit
 def get_error(xs,xs_hat):
@@ -1065,7 +1148,7 @@ if __name__ == '__main__':
 	# Initial Evaluation
 	#
 
-	for i in range(16, 17):
+	for i in range(1, 2):
 
 		print ("video %d" % i)
 
@@ -1127,7 +1210,7 @@ if __name__ == '__main__':
 		#
 
 		# get shot_frame_ranges
-		shot_frame_ranges = find_shot_frame_ranges(image_info_bundel, single_data_point_shots=True)
+		shot_frame_ranges = find_shot_frame_ranges(image_info_bundel, single_data_point_shots=False)
 		
 
 		#
@@ -1143,17 +1226,68 @@ if __name__ == '__main__':
 			shot_frames = np.linspace(sfr[0], sfr[1], sfr[1]-sfr[0])
 
 			# adjusted ys
-			pxs, pys_adjusted = find_ball_regression_formulas(image_info_bundel, sfr) #adjusted ys
+			pxs, pys_adjusted, pzs = find_normalized_ball_regression_formulas(image_info_bundel, sfr, return_pzs=True) #adjusted ys
 			xs = np.polyval(pxs, shot_frames)
 			ys_adjusted = np.polyval(pys_adjusted, shot_frames)
-			all_shot_data_points_adjusted.append([xs, ys_adjusted, shot_frames])
+			zs = np.polyval(pzs, shot_frames)
+			all_shot_data_points_adjusted.append([xs, ys_adjusted, zs, shot_frames])
 
+			"""
 			# not adjusted ys
-			pxs, pys = find_ball_regression_formulas(image_info_bundel, sfr, adjust_yvalues=False) #adjusted ys
+			pxs, pys = find_normalized_ball_regression_formulas(image_info_bundel, sfr, adjust_yvalues=False) #adjusted ys
 			xs = np.polyval(pxs, shot_frames)
 			ys = np.polyval(pys, shot_frames)
 			all_shot_data_points.append([xs, ys, shot_frames])
+			"""
 
+		norm_shot_xs, norm_shot_ys_adjusted, norm_shot_zs, shot_frames = all_shot_data_points_adjusted[0]
+
+		# invert y and z values
+		neg = lambda t: t*(-1)
+		invert_array = np.vectorize(neg)
+		norm_shot_ys_adjusted = invert_array(norm_shot_ys_adjusted)
+		norm_shot_zs = invert_array(norm_shot_zs)
+
+		# scale to balls acutal radius in meters
+		ball_radius_meters = 0.12
+		shot_xs_meters = np.array([nx*ball_radius_meters for nx in norm_shot_xs])
+		shot_ys_meters = np.array([ny*ball_radius_meters for ny in norm_shot_ys_adjusted])
+		shot_zs_meters = np.array([nz*ball_radius_meters for nz in norm_shot_zs])
+
+		ax = plt.axes(projection='3d')
+		ax.set_aspect('equal')
+		scat = ax.scatter(shot_xs_meters, shot_ys_meters, shot_zs_meters)
+		ax.set_xlabel('Xs meters')
+		ax.set_ylabel('Ys meters')
+		ax.set_zlabel('Zs meters')
+		# Create cubic bounding box to simulate equal aspect ratio
+		max_range = np.array([shot_xs_meters.max()-shot_xs_meters.min(), shot_ys_meters.max()-shot_ys_meters.min(), shot_zs_meters.max()-shot_zs_meters.min()]).max()
+		Xb = 0.5*max_range*np.mgrid[-1:2:2,-1:2:2,-1:2:2][0].flatten() + 0.5*(shot_xs_meters.max()+shot_xs_meters.min())
+		Yb = 0.5*max_range*np.mgrid[-1:2:2,-1:2:2,-1:2:2][1].flatten() + 0.5*(shot_ys_meters.max()+shot_ys_meters.min())
+		Zb = 0.5*max_range*np.mgrid[-1:2:2,-1:2:2,-1:2:2][2].flatten() + 0.5*(shot_zs_meters.max()+shot_zs_meters.min())
+		# Comment or uncomment following both lines to test the fake bounding box:
+		for xb, yb, zb in zip(Xb, Yb, Zb):
+		   ax.plot([xb], [yb], [zb], 'w')
+
+		plt.grid()
+		plt.show()
+		"""
+		ax.scatter3D(shot_xs_meters, shot_ys_meters, shot_zs_meters)
+		ax.set_xlabel('Xs meters')
+		ax.set_ylabel('Ys meters')
+		ax.set_zlabel('Zs meters')
+		plt.show()
+		"""
+
+		"""
+		ax = plt.axes(projection='3d')
+		ax.scatter3D(norm_shot_xs, norm_shot_ys_adjusted, norm_shot_zs)
+		ax.set_xlabel('norm Xs')
+		ax.set_ylabel('norm Ys')
+		ax.set_zlabel('norm Zs')
+		plt.show()
+		"""
+		"""
 		# tmp plot
 		shot_xs, shot_ys_adjusted, shot_frames = all_shot_data_points_adjusted[0]
 		shot_xs, shot_ys, shot_frames = all_shot_data_points[0]
@@ -1164,14 +1298,39 @@ if __name__ == '__main__':
 		shot_ys_adjusted = invert_array(shot_ys_adjusted)
 		shot_ys = invert_array(shot_ys)
 
+
+
+		#ax = plt.axes(projection='3d')
+		#ax.scatter3D(xs, ys, frames, c=ball_state_colors, cmap='Greens')
+		#ax.set_xlabel('Xs')
+		#ax.set_ylabel('Ys')
+		#ax.set_zlabel('frames')
+
 		# plot ajusted
+		minimum = min(shot_ys_adjusted + shot_xs + shot_ys)
+		maximum = max(shot_ys_adjusted + shot_xs + shot_ys)
+		print(shot_ys_adjusted + shot_xs + shot_ys)
+		print(shot_xs)
+		print(minimum)
+		print(maximum)
+		plt.ylim(minimum, maximum)
+		plt.xlim(minimum, maximum)
 		plt.plot(shot_xs, shot_ys_adjusted, c='g')
 		plt.xlabel('Xs', fontsize=18)
 		plt.ylabel('Ys', fontsize=18)
 
+		#ax.plot3D(shot_xs, shot_ys_adjusted, shot_frames, c='g', linewidth=1)
+		
+
 		#plot non adjusted
+		plt.ylim(minimum, maximum)
+		plt.xlim(minimum, maximum)
 		plt.plot(shot_xs, shot_ys, c='r')
 		plt.xlabel('Xs', fontsize=18)
 		plt.ylabel('Ys', fontsize=18)
 
+
+		#ax.plot3D(shot_xs, shot_ys, shot_frames, c='r', linewidth=1)
+
 		plt.show()
+		"""
