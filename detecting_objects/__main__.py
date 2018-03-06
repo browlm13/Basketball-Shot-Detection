@@ -1039,12 +1039,12 @@ def find_normalized_ball_regression_formulas(frame_info_bundel, shot_frame_range
 	#		* xs, ys, radii, frames, start_frame, stop_frame
 
 	# get boxes, frames, start_frame, and stop_frame in given frame range
-	ball_boxes, frames = zip(*known_boxes_in_frame_range(frame_info_bundel, shot_frame_range, 'basketball'))	#tuples
+	ball_boxes, frames = zip(*known_boxes_in_frame_range(frame_info_bundel, shot_frame_range, 'basketball'))
 	start_frame, stop_frame = frames[0], frames[-1]
 
 	# get average x and y values within given frame range (ball_marks)
 	ball_marks = [get_ball_mark(bb) for bb in ball_boxes]
-	xs, ys = zip(*ball_marks) 								#tuples
+	xs, ys = zip(*ball_marks)
 
 	# get ball radii within frame range
 	radii = [get_ball_radius(bb, integer=False) for bb in ball_boxes]
@@ -1114,6 +1114,93 @@ def find_normalized_ball_regression_formulas(frame_info_bundel, shot_frame_range
 		return [pxs_norm, pys_norm, pzs_norm_amplified]
 	return [pxs_norm, pys_norm, pzs_norm]
 
+def world_shot_position_vectors(frame_info_bundel, shot_frame_range):
+	"""
+	:param frame_info_bundel: frames_info_bundel object to extract world position vectors from
+	:param shot_frame_range: frame range to extract world position vectors from
+	:return: return matrix of world position vectors with x,y,z components as columns
+	"""
+	start_frame, stop_frame = shot_frame_range[0], shot_frame_range[1]
+	shot_frames = np.linspace(start_frame, stop_frame, stop_frame-start_frame+1)
+
+	# retrieve normalized polynomial coefficients for x, y and z components within given frame range
+	pxs_norm, pys_norm, pzs_norm = find_normalized_ball_regression_formulas(frame_info_bundel, shot_frame_range) #adjusted ys
+
+	# find x,y and z datapoints from normalized polynomial coefficients and given frame range
+	xs_norm = np.array(np.polyval(pxs_norm, shot_frames))
+	ys_norm = np.array(np.polyval(pys_norm, shot_frames))
+	zs_norm = np.array(np.polyval(pzs_norm, shot_frames))
+
+	# invert y and z values
+	neg = lambda t: t*(-1)
+	invert_array = np.vectorize(neg)
+	ys_norm = invert_array(ys_norm)
+	zs_norm = invert_array(zs_norm)
+
+	# scale to balls acutal radius in meters
+	ball_radius_meters = 0.12
+	xs_meters = np.multiply(xs_norm, ball_radius_meters)
+	ys_meters = np.multiply(ys_norm, ball_radius_meters)
+	zs_meters = np.multiply(zs_norm, ball_radius_meters)
+
+	# set starting point as origin on all axes
+	xs_meters = np.add(xs_meters, -xs_meters[0])
+	ys_meters = np.add(ys_meters, -ys_meters[0])
+	zs_meters = np.add(zs_meters, -zs_meters[0])
+
+	#return matrix
+	return np.array([xs_meters, ys_meters, zs_meters]).T
+
+def get_world_shot_xyzs(frame_info_bundel, shot_frame_range):
+	"""
+	:param frame_info_bundel: frames_info_bundel object to extract world position vectors from
+	:param shot_frame_range: frame range to extract world position vectors from
+	:return: return list of numpy arrays of world positions [xs,ys,zs] 
+	"""
+	world_position_vectors = world_shot_position_vectors(frame_info_bundel, shot_frame_range)
+	ball_radius_meters = 0.12
+	world_xs_meters = np.multiply(world_position_vectors[:,0],ball_radius_meters)
+	world_ys_meters = np.multiply(world_position_vectors[:,1],ball_radius_meters)
+	world_zs_meters = np.multiply(world_position_vectors[:,2],ball_radius_meters)
+	return [world_xs_meters,world_ys_meters, world_zs_meters]
+
+#source:https://newtonexcelbach.com/2014/03/01/the-angle-between-two-vectors-python-version/
+def py_ang(v1, v2, radians=True):
+    """ Returns the angle in radians (by defualt) between vectors 'v1' and 'v2'  """
+    cosang = np.dot(v1, v2)
+    sinang = np.linalg.norm(np.cross(v1, v2))
+    angle_radians = np.arctan2(sinang, cosang)
+    if radians:
+    	return angle_radians
+    return math.degrees(angle_radians)
+
+def get_initial_velocity(frame_info_bundel, shot_frame_range):
+	"""
+	:param frame_info_bundel: frames_info_bundel object to extract initial velocity from
+	:param shot_frame_range: frame range to extract initial velocity from
+	:return: return initial velocity (m/s)
+	"""
+	FPS=24	# speed of video
+	world_position_vectors = world_shot_position_vectors(frame_info_bundel, shot_frame_range)
+	initial_position_vector = world_position_vectors[1]
+	initial_velocity_vector = np.multiply(initial_position_vector, FPS)
+	initial_velocity = np.linalg.norm(initial_velocity_vector)
+	return initial_velocity
+
+
+def get_launch_angle(frame_info_bundel, shot_frame_range, radians=True):
+	"""
+	:param frame_info_bundel: frames_info_bundel object to extract launch angle from
+	:param shot_frame_range: frame range to extract launch angle from
+	:param radians: boolean default True, False will return degrees
+	:return: return launch angle defualt radians
+	"""
+	world_position_vectors = world_shot_position_vectors(frame_info_bundel, shot_frame_range)
+	initial_position_vector = world_position_vectors[1]
+	initial_x_component_vector = np.array([initial_position_vector[0], 0, 0])
+	launch_angle = py_ang(initial_x_component_vector, initial_position_vector,radians)
+	return launch_angle
+
 
 # get error of least squares fit
 def get_error(xs,xs_hat):
@@ -1147,16 +1234,6 @@ def error_of_slope_fit(m, p2_old, xs ,ys):
 	print(p2_corrected_ys)
 	return get_error(p2_corrected_ys, corrected_ys)
 
-#source:https://newtonexcelbach.com/2014/03/01/the-angle-between-two-vectors-python-version/
-def py_ang(v1, v2, radians=True):
-    """ Returns the angle in radians (by defualt) between vectors 'v1' and 'v2'  """
-    cosang = np.dot(v1, v2)
-    sinang = np.linalg.norm(np.cross(v1, v2))
-    angle_radians = np.arctan2(sinang, cosang)
-    if radians:
-    	return angle_radians
-    return math.degrees(angle_radians)
-
 #
 #
 #                                           Main
@@ -1169,7 +1246,7 @@ if __name__ == '__main__':
 	# Initial Evaluation
 	#
 
-	for i in range(16, 17):
+	for i in range(2, 3):
 
 		print ("video %d" % i)
 
@@ -1238,20 +1315,18 @@ if __name__ == '__main__':
 		#   Extract Extrapolated Shot Datapoints
 		#
 
-		# get shot datapoints
-		all_shot_data_points_adjusted = [] # [[xs, ys_adjusted, frames], ...]
-		all_shot_data_points = [] # [[xs, ys, frames], ...]
+		# get world shot data
+		world_data = [] #[xs_meters, ys_meters, zs_meters, shot_frames, initial_velocity, launch_angle_degrees]
 		for sfr in shot_frame_ranges:
 
-			# strech/extrapolate datapoints with regression formulas
-			shot_frames = np.linspace(sfr[0], sfr[1], sfr[1]-sfr[0])
+			# world data points
+			start_frame, stop_frame = sfr[0], sfr[1]
+			shot_frames = np.linspace(start_frame, stop_frame, stop_frame-start_frame+1)
+			initial_velocity = get_initial_velocity(image_info_bundel, sfr)
+			launch_angle_degrees = get_launch_angle(image_info_bundel, sfr, radians=False)
+			xs_meters, ys_meters, zs_meters = get_world_shot_xyzs(image_info_bundel, sfr)
+			world_data.append([xs_meters, ys_meters, zs_meters, shot_frames, initial_velocity, launch_angle_degrees])
 
-			# adjusted ys
-			pxs, pys_adjusted, pzs = find_normalized_ball_regression_formulas(image_info_bundel, sfr) #adjusted ys
-			xs = np.polyval(pxs, shot_frames)
-			ys_adjusted = np.polyval(pys_adjusted, shot_frames)
-			zs = np.polyval(pzs, shot_frames)
-			all_shot_data_points_adjusted.append([xs, ys_adjusted, zs, shot_frames])
 
 			"""
 			# not adjusted ys
@@ -1261,6 +1336,37 @@ if __name__ == '__main__':
 			all_shot_data_points.append([xs, ys, shot_frames])
 			"""
 
+		#testing
+		shot_xs_meters, shot_ys_meters, shot_zs_meters, shot_frames, initial_velocity, launch_angle_degrees = world_data[0]
+
+		ax = plt.axes(projection='3d')
+		ax.set_aspect('equal')
+		scat = ax.scatter(shot_xs_meters, shot_ys_meters, shot_zs_meters, c=(1,.45,0), edgecolors=(1,.3,0))
+		ax.set_xlabel('Xs meters', linespacing=3.2)
+		ax.set_ylabel('\tYs meters', linespacing=3.2)
+		ax.set_zlabel('\tZs meters', linespacing=3.2)
+		ax.yaxis.set_rotate_label(False) 
+		ax.zaxis.set_rotate_label(False) 
+		ax.tick_params(direction='out', length=2, width=1, colors='b', labelsize='small')
+		# Create cubic bounding box to simulate equal aspect ratio
+		max_range = np.array([shot_xs_meters.max()-shot_xs_meters.min(), shot_ys_meters.max()-shot_ys_meters.min(), shot_zs_meters.max()-shot_zs_meters.min()]).max()
+		Xb = 0.5*max_range*np.mgrid[-1:2:2,-1:2:2,-1:2:2][0].flatten() + 0.5*(shot_xs_meters.max()+shot_xs_meters.min())
+		Yb = 0.5*max_range*np.mgrid[-1:2:2,-1:2:2,-1:2:2][1].flatten() + 0.5*(shot_ys_meters.max()+shot_ys_meters.min())
+		Zb = 0.5*max_range*np.mgrid[-1:2:2,-1:2:2,-1:2:2][2].flatten() + 0.5*(shot_zs_meters.max()+shot_zs_meters.min())
+		# Comment or uncomment following both lines to test the fake bounding box:
+		for xb, yb, zb in zip(Xb, Yb, Zb):
+		   ax.plot([xb], [yb], [zb], 'w')
+
+		figure_text = "Initial Velocity %f m/s\nLaunch Angle %f degrees" % (initial_velocity, launch_angle_degrees)
+		plt.figtext(.25, 0.125, figure_text, style='italic',
+        bbox={'facecolor':'blue', 'alpha':0.5, 'pad':10})
+		ax.view_init(elev=140, azim=-90)
+
+		ax.scatter(shot_xs_meters[0], shot_ys_meters[0], shot_zs_meters[0], c='None', s=100,edgecolors='g', linewidths=2)
+
+		plt.grid()
+		plt.show()
+		"""
 		norm_shot_xs, norm_shot_ys_adjusted, norm_shot_zs, shot_frames = all_shot_data_points_adjusted[0]
 
 		# invert y and z values
@@ -1332,6 +1438,8 @@ if __name__ == '__main__':
 		plt.grid()
 		plt.show()
 		"""
+
+		"""
 		ax.scatter3D(shot_xs_meters, shot_ys_meters, shot_zs_meters)
 		ax.set_xlabel('Xs meters')
 		ax.set_ylabel('Ys meters')
@@ -1394,3 +1502,4 @@ if __name__ == '__main__':
 
 		plt.show()
 		"""
+
