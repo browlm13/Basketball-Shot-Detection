@@ -1047,9 +1047,12 @@ def find_normalized_ball_regression_formulas(frame_info_bundel, shot_frame_range
 	zs_distance_change_coeff = [1/r for r in normalized_ball_radii]
 
 	# find regression formula then scale to balls distance away
+
+	# inear regression std error for z values
+	# use r_value in slope amplification
+	slope, intercept, r_value, p_value, std_err = stats.linregress(frames, zs_distance_change_coeff)
 	pzs_change_coeff = np.polyfit(frames, zs_distance_change_coeff, 1)
 	total_shot_frames = np.linspace(frames[0], frames[-1], frames[-1]-frames[0])
-	#zs_change_coeffs = np.polyval(pzs_change_coeff, total_shot_frames)
 	zs_change_coeffs = np.polyval(pzs_change_coeff, frames)
 	
 	"""
@@ -1098,8 +1101,11 @@ def find_normalized_ball_regression_formulas(frame_info_bundel, shot_frame_range
 
 	# return normalized polynomial coefficents
 	if return_pzs:
-		normalized_zs = pzs_change_coeff
-		return [normalized_pxs, normalized_pys, normalized_zs]
+		# amplify z change - use r value in amplification
+		pzs_slope, pzs_intercept= pzs_change_coeff
+		pz_amplified_slope = (pzs_slope)*((abs(pzs_slope) + math.pi)**3)*(r_value**3)
+		normalized_pzs = [pz_amplified_slope, pzs_intercept] 
+		return [normalized_pxs, normalized_pys, normalized_pzs]
 	else:
 		return [normalized_pxs, normalized_pys]
 
@@ -1148,7 +1154,7 @@ if __name__ == '__main__':
 	# Initial Evaluation
 	#
 
-	for i in range(1, 2):
+	for i in range(16, 17):
 
 		print ("video %d" % i)
 
@@ -1334,3 +1340,4 @@ if __name__ == '__main__':
 
 		plt.show()
 		"""
+
