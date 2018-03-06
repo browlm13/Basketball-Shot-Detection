@@ -8,15 +8,15 @@ Our program is able to detect when a shot occurs and extrapolate the balls fligh
 ### Output world coordinates
 ![world coordinates](shot_1_trajectory_extrapolation_points_v1.png)
 
-### Tracking and anylisis performed of interrupted shot by person
+### Tracking and anylisis performed on interrupted shot by person
 ![Shot with missing datapoints](shot_2.gif)
 ### Trajectory Extrapolation
 [Trajectory](shot_2.png)
 ### Output world coordinates
 ![world coordinates](shot_2_trajectory_extrapolation_points_v1.png)
 
-### Tracking and anylisis performed of interrupted shot by object
-### Successful anylisis of shot angle 
+### Tracking and anylisis performed on interrupted shot by object
+#### Successful anylisis of shot angle 
 ![Hits net piecewise linear regression](shot_16.gif)
 ### Output world coordinates
 ![world coordinates](shot_16_trajectory_extrapolation_points_v1.png)
