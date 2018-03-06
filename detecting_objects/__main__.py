@@ -1246,11 +1246,12 @@ if __name__ == '__main__':
 	# Initial Evaluation
 	#
 
-	for i in range(2, 3):
+	shots = [1,2,5,16,18]
+	for i in shots: #range(16, 17):
 
 		print ("video %d" % i)
 
-		model_collection_name = "basketball_model_v1" #"person_basketball_model_v1"
+		model_collection_name = "basketball_model_v1" #"person_basketball_model_v1" #
 
 		#input video frames directory paths
 		video_frames_dirpath = "/Users/ljbrown/Desktop/StatGeek/object_detection/video_frames/frames_shot_%s" % i
@@ -1318,6 +1319,7 @@ if __name__ == '__main__':
 		# get world shot data
 		world_data = [] #[xs_meters, ys_meters, zs_meters, shot_frames, initial_velocity, launch_angle_degrees]
 		for sfr in shot_frame_ranges:
+			print(sfr)
 
 			# world data points
 			start_frame, stop_frame = sfr[0], sfr[1]
@@ -1327,170 +1329,38 @@ if __name__ == '__main__':
 			xs_meters, ys_meters, zs_meters = get_world_shot_xyzs(image_info_bundel, sfr)
 			world_data.append([xs_meters, ys_meters, zs_meters, shot_frames, initial_velocity, launch_angle_degrees])
 
-		#testing
-		shot_xs_meters, shot_ys_meters, shot_zs_meters, shot_frames, initial_velocity, launch_angle_degrees = world_data[0]
+			try:
+				#testing
+				shot_xs_meters, shot_ys_meters, shot_zs_meters, shot_frames, initial_velocity, launch_angle_degrees = xs_meters, ys_meters, zs_meters, shot_frames, initial_velocity, launch_angle_degrees #world_data[0]
 
-		ax = plt.axes(projection='3d')
-		ax.set_aspect('equal')
-		scat = ax.scatter(shot_xs_meters, shot_ys_meters, shot_zs_meters, c=(1,.45,0), edgecolors=(1,.3,0))
-		ax.set_xlabel('Xs meters', linespacing=3.2)
-		ax.set_ylabel('\tYs meters', linespacing=3.2)
-		ax.set_zlabel('\tZs meters', linespacing=3.2)
-		ax.yaxis.set_rotate_label(False) 
-		ax.zaxis.set_rotate_label(False) 
-		ax.tick_params(direction='out', length=2, width=1, colors='b', labelsize='small')
-		# Create cubic bounding box to simulate equal aspect ratio
-		max_range = np.array([shot_xs_meters.max()-shot_xs_meters.min(), shot_ys_meters.max()-shot_ys_meters.min(), shot_zs_meters.max()-shot_zs_meters.min()]).max()
-		Xb = 0.5*max_range*np.mgrid[-1:2:2,-1:2:2,-1:2:2][0].flatten() + 0.5*(shot_xs_meters.max()+shot_xs_meters.min())
-		Yb = 0.5*max_range*np.mgrid[-1:2:2,-1:2:2,-1:2:2][1].flatten() + 0.5*(shot_ys_meters.max()+shot_ys_meters.min())
-		Zb = 0.5*max_range*np.mgrid[-1:2:2,-1:2:2,-1:2:2][2].flatten() + 0.5*(shot_zs_meters.max()+shot_zs_meters.min())
-		# Comment or uncomment following both lines to test the fake bounding box:
-		for xb, yb, zb in zip(Xb, Yb, Zb):
-		   ax.plot([xb], [yb], [zb], 'w')
+				ax = plt.axes(projection='3d')
+				ax.set_aspect('equal')
+				scat = ax.scatter(shot_xs_meters, shot_ys_meters, shot_zs_meters, c=(1,.45,0), edgecolors=(1,.3,0))
+				ax.plot(shot_xs_meters, shot_ys_meters, shot_zs_meters)
+				ax.set_xlabel('Xs meters', linespacing=3.2)
+				ax.set_ylabel('\tYs meters', linespacing=3.2)
+				ax.set_zlabel('\tZs meters', linespacing=3.2)
+				ax.yaxis.set_rotate_label(False)
+				ax.zaxis.set_rotate_label(False)
+				ax.tick_params(direction='out', length=2, width=1, colors='b', labelsize='small')
+				# Create cubic bounding box to simulate equal aspect ratio
+				max_range = np.array([shot_xs_meters.max()-shot_xs_meters.min(), shot_ys_meters.max()-shot_ys_meters.min(), shot_zs_meters.max()-shot_zs_meters.min()]).max()
+				Xb = 0.5*max_range*np.mgrid[-1:2:2,-1:2:2,-1:2:2][0].flatten() + 0.5*(shot_xs_meters.max()+shot_xs_meters.min())
+				Yb = 0.5*max_range*np.mgrid[-1:2:2,-1:2:2,-1:2:2][1].flatten() + 0.5*(shot_ys_meters.max()+shot_ys_meters.min())
+				Zb = 0.5*max_range*np.mgrid[-1:2:2,-1:2:2,-1:2:2][2].flatten() + 0.5*(shot_zs_meters.max()+shot_zs_meters.min())
+				# Comment or uncomment following both lines to test the fake bounding box:
+				for xb, yb, zb in zip(Xb, Yb, Zb):
+				   ax.plot([xb], [yb], [zb], 'w')
 
-		figure_text = "Initial Velocity %f m/s\nLaunch Angle %f degrees" % (initial_velocity, launch_angle_degrees)
-		plt.figtext(.25, 0.125, figure_text, style='italic',
-        bbox={'facecolor':'blue', 'alpha':0.5, 'pad':10})
-		ax.view_init(elev=140, azim=-90)
+				figure_text = "Video %d\nInitial Velocity %f m/s\nLaunch Angle %f degrees" % (i,initial_velocity, launch_angle_degrees)
+				plt.figtext(.25, 0.125, figure_text, style='italic',
+		        bbox={'facecolor':'blue', 'alpha':0.5, 'pad':10})
+				ax.view_init(elev=140, azim=-90)
 
-		ax.scatter(shot_xs_meters[0], shot_ys_meters[0], shot_zs_meters[0], c='None', s=100,edgecolors='g', linewidths=2)
+				ax.scatter(shot_xs_meters[0], shot_ys_meters[0], shot_zs_meters[0], c='None', s=100,edgecolors='g', linewidths=2)
+				plt.grid()
 
-		plt.grid()
-		plt.show()
-		"""
-		norm_shot_xs, norm_shot_ys_adjusted, norm_shot_zs, shot_frames = all_shot_data_points_adjusted[0]
-
-		# invert y and z values
-		neg = lambda t: t*(-1)
-		invert_array = np.vectorize(neg)
-		norm_shot_ys_adjusted = invert_array(norm_shot_ys_adjusted)
-		norm_shot_zs = invert_array(norm_shot_zs)
-
-		# scale to balls acutal radius in meters
-		ball_radius_meters = 0.12
-		shot_xs_meters = np.array([nx*ball_radius_meters for nx in norm_shot_xs])
-		shot_ys_meters = np.array([ny*ball_radius_meters for ny in norm_shot_ys_adjusted])
-		shot_zs_meters = np.array([nz*ball_radius_meters for nz in norm_shot_zs])
-
-		# calculate initial veloctiy
-		FPS=24
-		x_velocity = (shot_xs_meters[1] - shot_xs_meters[0])*FPS
-		y_velocity = (shot_ys_meters[1] - shot_ys_meters[0])*FPS
-		z_velocity = (shot_zs_meters[1] - shot_zs_meters[0])*FPS
-		x_velocity_vector = np.array([x_velocity,0,0])
-		y_velocity_vector = np.array([0,y_velocity,0])
-		z_velocity_vector = np.array([0,0,z_velocity])
-		y_velocity = (shot_ys_meters[1] - shot_ys_meters[0])*FPS
-		z_velocity = (shot_zs_meters[1] - shot_zs_meters[0])*FPS
-		#initial_velocity = math.sqrt(x_velocity**2 + y_velocity**2 + z_velocity**2)
-		initial_velocity_vector = np.array([x_velocity, y_velocity, z_velocity])
-		initial_velocity = np.linalg.norm(initial_velocity_vector)
-		print("x velocity %f m/s" % x_velocity)
-		print("y velocity %f m/s" % y_velocity)
-		print("z velocity %f m/s" % z_velocity)
-		print("\ninitial_velocity: %f m/s" % initial_velocity)
-
-		# calculate launch angle
-		launch_angle_degrees = py_ang(x_velocity_vector, initial_velocity_vector,radians=False)
-		print("Launch Angle Degrees %f" % launch_angle_degrees)
-
-
-		ax = plt.axes(projection='3d')
-		ax.set_aspect('equal')
-		scat = ax.scatter(shot_xs_meters, shot_ys_meters, shot_zs_meters, c=(1,.45,0), edgecolors=(1,.3,0))
-		ax.set_xlabel('Xs meters', linespacing=3.2)
-		ax.set_ylabel('\tYs meters', linespacing=3.2)
-		ax.set_zlabel('\tZs meters', linespacing=3.2)
-		ax.yaxis.set_rotate_label(False) 
-		ax.zaxis.set_rotate_label(False) 
-		ax.tick_params(direction='out', length=2, width=1, colors='b', labelsize='small')
-		# Create cubic bounding box to simulate equal aspect ratio
-		max_range = np.array([shot_xs_meters.max()-shot_xs_meters.min(), shot_ys_meters.max()-shot_ys_meters.min(), shot_zs_meters.max()-shot_zs_meters.min()]).max()
-		Xb = 0.5*max_range*np.mgrid[-1:2:2,-1:2:2,-1:2:2][0].flatten() + 0.5*(shot_xs_meters.max()+shot_xs_meters.min())
-		Yb = 0.5*max_range*np.mgrid[-1:2:2,-1:2:2,-1:2:2][1].flatten() + 0.5*(shot_ys_meters.max()+shot_ys_meters.min())
-		Zb = 0.5*max_range*np.mgrid[-1:2:2,-1:2:2,-1:2:2][2].flatten() + 0.5*(shot_zs_meters.max()+shot_zs_meters.min())
-		# Comment or uncomment following both lines to test the fake bounding box:
-		for xb, yb, zb in zip(Xb, Yb, Zb):
-		   ax.plot([xb], [yb], [zb], 'w')
-
-		#component vectors
-		x_norm_vector = np.divide(x_velocity_vector,initial_velocity)
-		y_norm_vector = np.divide(y_velocity_vector,initial_velocity)
-		z_norm_vector = np.divide(z_velocity_vector,initial_velocity)
-		#ax.quiver(shot_xs_meters[0],shot_ys_meters[0],shot_zs_meters[0], x_norm_vector, y_norm_vector, z_norm_vector, 0) #, pivot='tail')
-		#ax.quiver(shot_xs_meters[0],shot_ys_meters[0],shot_zs_meters[0], x_norm_vector, y_norm_vector, z_norm_vector, pivot='tail')
-		figure_text = "Initial Velocity %f m/s\nLaunch Angle %f degrees" % (initial_velocity, launch_angle_degrees)
-		plt.figtext(.25, 0.125, figure_text, style='italic',
-        bbox={'facecolor':'blue', 'alpha':0.5, 'pad':10})
-		ax.view_init(elev=140, azim=-90)
-
-		ax.scatter(shot_xs_meters[0], shot_ys_meters[0], shot_zs_meters[0], c='None', s=100,edgecolors='g', linewidths=2)
-
-		plt.grid()
-		plt.show()
-		"""
-
-		"""
-		ax.scatter3D(shot_xs_meters, shot_ys_meters, shot_zs_meters)
-		ax.set_xlabel('Xs meters')
-		ax.set_ylabel('Ys meters')
-		ax.set_zlabel('Zs meters')
-		plt.show()
-		"""
-
-		"""
-		ax = plt.axes(projection='3d')
-		ax.scatter3D(norm_shot_xs, norm_shot_ys_adjusted, norm_shot_zs)
-		ax.set_xlabel('norm Xs')
-		ax.set_ylabel('norm Ys')
-		ax.set_zlabel('norm Zs')
-		plt.show()
-		"""
-		"""
-		# tmp plot
-		shot_xs, shot_ys_adjusted, shot_frames = all_shot_data_points_adjusted[0]
-		shot_xs, shot_ys, shot_frames = all_shot_data_points[0]
-
-		# invert y values
-		neg = lambda t: t*(-1)
-		invert_array = np.vectorize(neg)
-		shot_ys_adjusted = invert_array(shot_ys_adjusted)
-		shot_ys = invert_array(shot_ys)
-
-
-
-		#ax = plt.axes(projection='3d')
-		#ax.scatter3D(xs, ys, frames, c=ball_state_colors, cmap='Greens')
-		#ax.set_xlabel('Xs')
-		#ax.set_ylabel('Ys')
-		#ax.set_zlabel('frames')
-
-		# plot ajusted
-		minimum = min(shot_ys_adjusted + shot_xs + shot_ys)
-		maximum = max(shot_ys_adjusted + shot_xs + shot_ys)
-		print(shot_ys_adjusted + shot_xs + shot_ys)
-		print(shot_xs)
-		print(minimum)
-		print(maximum)
-		plt.ylim(minimum, maximum)
-		plt.xlim(minimum, maximum)
-		plt.plot(shot_xs, shot_ys_adjusted, c='g')
-		plt.xlabel('Xs', fontsize=18)
-		plt.ylabel('Ys', fontsize=18)
-
-		#ax.plot3D(shot_xs, shot_ys_adjusted, shot_frames, c='g', linewidth=1)
-		
-
-		#plot non adjusted
-		plt.ylim(minimum, maximum)
-		plt.xlim(minimum, maximum)
-		plt.plot(shot_xs, shot_ys, c='r')
-		plt.xlabel('Xs', fontsize=18)
-		plt.ylabel('Ys', fontsize=18)
-
-
-		#ax.plot3D(shot_xs, shot_ys, shot_frames, c='r', linewidth=1)
-
-		plt.show()
-		"""
-
+				#fig.canvas.draw()
+				plt.show()
+			except: 
+				pass
