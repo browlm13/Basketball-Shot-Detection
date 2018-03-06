@@ -8,9 +8,12 @@
 ### Tolerant to Missing Datapoints
 ![Trajectory](shot_2.png)
 ![Shot with missing datapoints](shot_2.gif)
-
+### World Coordinates
+![world coordinates](shot_2_trajectory_extrapolation_points.png)
 ## End of Shot detection 
 ### (Exclude Data Points After Ball Hits Objects)
 ![Hits net piecewise linear regression](shot_16.gif)
 ### (Adjust Trajectories For Shot Angle/Camera Depth)
 ![Depth Adjustment](depth_adjustment_shot_16.png)
+### World Coordinates
+![world coordinates](shot_16_trajectory_extrapolation_points.png)
