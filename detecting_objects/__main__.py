@@ -1016,97 +1016,104 @@ def find_ball_regression_formulas(frame_info_bundel, shot_frame_range, adjust_yv
 	# return polynomial coefficents
 	return [pxs, pys]
 
-def find_normalized_ball_regression_formulas(frame_info_bundel, shot_frame_range, adjust_yvalues=True, return_pzs=False):
+def find_normalized_ball_regression_formulas(frame_info_bundel, shot_frame_range, adjust_yvalues=True, amplify_zslope=True):
 	"""
 	:param frames_info_bundel: frames_info_bundel object to extract regression formulas from
 	:param shot_frame_range: frame range to extract regression formulas from
 	:return: normalized regression polynomial coeffiecnts to balls radius in pixels list [pxs,pys]. format pis: [(coeff 0)frame^0, (coeff 1)frame^1, ...] -- (np.polyfit)
 	"""
-	# note cannot handle frame ranges of single value
 
-	# get xs, ys, radiis known datapoints in frame range
+	# NOTE: cannot handle frame ranges of single value
 
-	# get known boxes in frame range
+	#
+	# 	Find normalized polynomial coefficients describing shot trajectories for x,y and z axes within given frame range
+	#	
+	#		* use trends in basketball radii to determine z axes function
+	#		* adjust y function using z function
+	#		* normalize functions to the radius of the basketball in pixels
+
+
+	#
+	#	Retrieve x, y, and radius data points identified by model within the given frame range
+	#
+	#		* xs, ys, radii, frames, start_frame, stop_frame
+
+	# get boxes, frames, start_frame, and stop_frame in given frame range
 	ball_boxes, frames = zip(*known_boxes_in_frame_range(frame_info_bundel, shot_frame_range, 'basketball'))	#tuples
-	
-	# get known ball marks
+	start_frame, stop_frame = frames[0], frames[-1]
+
+	# get average x and y values within given frame range (ball_marks)
 	ball_marks = [get_ball_mark(bb) for bb in ball_boxes]
+	xs, ys = zip(*ball_marks) 								#tuples
 
-	#find average x and y values
-	xs, ys = zip(*ball_marks) 	#tuples
+	# get ball radii within frame range
+	radii = [get_ball_radius(bb, integer=False) for bb in ball_boxes]
 
-	# find ball radii
-	ball_radii = [get_ball_radius(bb, integer=False) for bb in ball_boxes]
-
-	# normalize radii for change only
-	# normalize to first radii
-	normalized_ball_radii = [r/ball_radii[0] for r in ball_radii]
-
-	# zs_distance_change_coeff - 1/normalized ball radii. this represents the balls distance change from its startposition at the origin
-	# greater than 1 is farther away, 2 is twice as far away
-	zs_distance_change_coeff = [1/r for r in normalized_ball_radii]
-
-	# find regression formula then scale to balls distance away
-
-	# inear regression std error for z values
-	# use r_value in slope amplification
-	slope, intercept, r_value, p_value, std_err = stats.linregress(frames, zs_distance_change_coeff)
-	pzs_change_coeff = np.polyfit(frames, zs_distance_change_coeff, 1)
-	total_shot_frames = np.linspace(frames[0], frames[-1], frames[-1]-frames[0])
-	zs_change_coeffs = np.polyval(pzs_change_coeff, frames)
-	
-	"""
-	# find average distance away
-	# find average radii
-	np_ball_radii = np.array(ball_radii)
-	mean_radius = np_ball_radii.mean()
-	start_mean_radius = (mean_radii + ball_radii[0]*2)/3	# estimate of intial radii, weighted tword start radius
-	
-	# distance estimate from radius
-	# get frame path dict
-	frame_path_dict = frame_info_bundel_to_frame_path_dict(frame_info_bundel)
-	image_height_pixels = load_image_np(frame_path_dict[frames[0]]).shape[0]
-	BALL_TRUE_RADIUS = 
-	
-	#distance_from_radius = lambda r: math.atan(start_mean_radius/image_height_pixels)
-	"""
+	#
+	#	Find z axis normalized polynomial coefficients
+	#
+	#		* normalize basketball radii to start_frames radius
+	#		* find regression function describing trends in the changing normalized basketball radius sizes
+	#		# amplify normalized radii size regression function to find normalized z function
+	#
+	#		Justification : If the balls radius is twice as far away it will be half the size
 
 
-	# ys adjuseted
-	# y_adjusted = y/z_change_coeff_matched_range
-	# 
-	ys_adjusted = [y/zcc for y,zcc in zip(ys, zs_change_coeffs)]
+	# normalize basketball radii to start_frames radius
+	norm_radii = [r/radii[0] for r in radii]
 
-	# find x regression polynomial coeffiecnts
-	#xs - degreen 1 regression fit 
-	pxs = np.polyfit(frames, xs, 1)
+	# find regression function describing trends in the changing normalized basketball radius sizes
+	slope, intercept, r_value, p_value, std_err = stats.linregress(frames, norm_radii)
 
-	# find y regreesion polynomial coeffiecents - currently do not take into account z corrections
-	#ys - degreen 2 regression fit 
-	pys = np.polyfit(frames, ys, 2)
+	# amplify normalized radii size regression function to find normalized z function
+	#	* amplify slope of normalized radii size regression function 
+	#	* damp slope of normalized radii size regression function with r_value
+	amplified_slope = (slope)*((abs(slope) + math.pi)**3)*(r_value**3)
+
+	# normalized polynomial coefficients for z axis function
+	pzs_norm = [slope, intercept] 										# final
+	pzs_norm_amplified = [amplified_slope, intercept] 					# final (if amplify_zslope)
+
+	#
+	#	Find y axis normalized polynomial coefficients
+	#
+	#		* adjust y data points using z function:
+	#													formula: yi_adjusted = yi * zi_norm
+	#		* normalize adjusted y datapoints to basketball radius in pixels
+	#		* find polynomial coefficients for second degree regression fit of normalized and adjusted y values
+
+	# adjust y data points using z function
+	zs_norm = np.polyval(pzs_norm, frames)
 
 	if adjust_yvalues:
-		# find pys with z correction
-		pys = np.polyfit(frames, ys_adjusted, 2)
+		ys = [y*z for y,z in zip(ys, zs_norm)]
 
-	# normalize xs and ys to change from first datapoint
-	regression_xs = np.polyval(pxs, frames)
-	regression_ys = np.polyval(pys, frames)
-	centered_xs = [x -regression_xs[0] for x in regression_xs]
-	centered_ys = [y -regression_ys[0] for y in regression_ys]
-	normalized_xs = [x/r for x,r in zip(xs, ball_radii)] 	#normalize to ball radius in pixels
-	normalized_ys = [y/r for y,r in zip(ys, ball_radii)] 	#normalize to ball radius in pixels
-	normalized_pxs = np.polyfit(frames, normalized_xs, 1)
-	normalized_pys = np.polyfit(frames, normalized_ys, 2)
+	# normalize adjusted y datapoints to basketball radius in pixels
+	ys_norm = [y/r for y,r in zip(ys, radii)]
 
+	# find polynomial coefficients for second degree regression fit of normalized and adjusted y values
+	pys_norm = np.polyfit(frames, ys_norm, 2)					# final
+
+	#
+	#	Find x axis normalized polynomial coefficients
+	#
+	#		* normalize adjusted x datapoints to basketball radius in pixels
+	#		* find polynomial coefficients for first degree regression fit of normalized and adjusted x values
+
+	# normalize adjusted x datapoints to basketball radius in pixels
+	xs_norm = [x/r for x,r in zip(xs, radii)] 
+
+	# find polynomial coefficients for first degree regression fit of normalized and adjusted x values
+	pxs_norm = np.polyfit(frames, xs_norm, 1)				# final
+
+	#
 	# return normalized polynomial coefficents
-	if return_pzs:
-		pzs_slope, pzs_intercept= pzs_change_coeff
-		pz_amplified_slope = (pzs_slope)*((abs(pzs_slope) + math.pi)**3)*(r_value**3)
-		normalized_pzs = [pz_amplified_slope, pzs_intercept] 
-		return [normalized_pxs, normalized_pys, normalized_pzs]
-	else:
-		return [normalized_pxs, normalized_pys]
+	#
+
+	if amplify_zslope:
+		return [pxs_norm, pys_norm, pzs_norm_amplified]
+	return [pxs_norm, pys_norm, pzs_norm]
+
 
 # get error of least squares fit
 def get_error(xs,xs_hat):
@@ -1162,7 +1169,7 @@ if __name__ == '__main__':
 	# Initial Evaluation
 	#
 
-	for i in range(2, 3):
+	for i in range(16, 17):
 
 		print ("video %d" % i)
 
@@ -1240,7 +1247,7 @@ if __name__ == '__main__':
 			shot_frames = np.linspace(sfr[0], sfr[1], sfr[1]-sfr[0])
 
 			# adjusted ys
-			pxs, pys_adjusted, pzs = find_normalized_ball_regression_formulas(image_info_bundel, sfr, return_pzs=True) #adjusted ys
+			pxs, pys_adjusted, pzs = find_normalized_ball_regression_formulas(image_info_bundel, sfr) #adjusted ys
 			xs = np.polyval(pxs, shot_frames)
 			ys_adjusted = np.polyval(pys_adjusted, shot_frames)
 			zs = np.polyval(pzs, shot_frames)
@@ -1387,4 +1394,3 @@ if __name__ == '__main__':
 
 		plt.show()
 		"""
-
