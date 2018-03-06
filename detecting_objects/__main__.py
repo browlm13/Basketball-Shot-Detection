@@ -1312,7 +1312,7 @@ if __name__ == '__main__':
 		
 
 		#
-		#   Extract Extrapolated Shot Datapoints
+		#   Extract Extrapolated World Shot Datapoints
 		#
 
 		# get world shot data
@@ -1326,15 +1326,6 @@ if __name__ == '__main__':
 			launch_angle_degrees = get_launch_angle(image_info_bundel, sfr, radians=False)
 			xs_meters, ys_meters, zs_meters = get_world_shot_xyzs(image_info_bundel, sfr)
 			world_data.append([xs_meters, ys_meters, zs_meters, shot_frames, initial_velocity, launch_angle_degrees])
-
-
-			"""
-			# not adjusted ys
-			pxs, pys = find_normalized_ball_regression_formulas(image_info_bundel, sfr, adjust_yvalues=False) #adjusted ys
-			xs = np.polyval(pxs, shot_frames)
-			ys = np.polyval(pys, shot_frames)
-			all_shot_data_points.append([xs, ys, shot_frames])
-			"""
 
 		#testing
 		shot_xs_meters, shot_ys_meters, shot_zs_meters, shot_frames, initial_velocity, launch_angle_degrees = world_data[0]
