@@ -3,6 +3,8 @@
 
 ## Tracking in Unstable Video
 ![Unstable Video](shot_1.gif)
+### World Coordinates
+![world coordinates](shot_1_trajectory_extrapolation_points.png)
 
 ## Trajectory Extrapolation
 ### Tolerant to Missing Datapoints
