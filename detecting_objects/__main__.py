@@ -1101,7 +1101,6 @@ def find_normalized_ball_regression_formulas(frame_info_bundel, shot_frame_range
 
 	# return normalized polynomial coefficents
 	if return_pzs:
-		# amplify z change - use r value in amplification
 		pzs_slope, pzs_intercept= pzs_change_coeff
 		pz_amplified_slope = (pzs_slope)*((abs(pzs_slope) + math.pi)**3)*(r_value**3)
 		normalized_pzs = [pz_amplified_slope, pzs_intercept] 
@@ -1141,6 +1140,15 @@ def error_of_slope_fit(m, p2_old, xs ,ys):
 	print(p2_corrected_ys)
 	return get_error(p2_corrected_ys, corrected_ys)
 
+#source:https://newtonexcelbach.com/2014/03/01/the-angle-between-two-vectors-python-version/
+def py_ang(v1, v2, radians=True):
+    """ Returns the angle in radians (by defualt) between vectors 'v1' and 'v2'  """
+    cosang = np.dot(v1, v2)
+    sinang = np.linalg.norm(np.cross(v1, v2))
+    angle_radians = np.arctan2(sinang, cosang)
+    if radians:
+    	return angle_radians
+    return math.degrees(angle_radians)
 
 #
 #
@@ -1154,7 +1162,7 @@ if __name__ == '__main__':
 	# Initial Evaluation
 	#
 
-	for i in range(16, 17):
+	for i in range(2, 3):
 
 		print ("video %d" % i)
 
@@ -1260,12 +1268,38 @@ if __name__ == '__main__':
 		shot_ys_meters = np.array([ny*ball_radius_meters for ny in norm_shot_ys_adjusted])
 		shot_zs_meters = np.array([nz*ball_radius_meters for nz in norm_shot_zs])
 
+		# calculate initial veloctiy
+		FPS=24
+		x_velocity = (shot_xs_meters[1] - shot_xs_meters[0])*FPS
+		y_velocity = (shot_ys_meters[1] - shot_ys_meters[0])*FPS
+		z_velocity = (shot_zs_meters[1] - shot_zs_meters[0])*FPS
+		x_velocity_vector = np.array([x_velocity,0,0])
+		y_velocity_vector = np.array([0,y_velocity,0])
+		z_velocity_vector = np.array([0,0,z_velocity])
+		y_velocity = (shot_ys_meters[1] - shot_ys_meters[0])*FPS
+		z_velocity = (shot_zs_meters[1] - shot_zs_meters[0])*FPS
+		#initial_velocity = math.sqrt(x_velocity**2 + y_velocity**2 + z_velocity**2)
+		initial_velocity_vector = np.array([x_velocity, y_velocity, z_velocity])
+		initial_velocity = np.linalg.norm(initial_velocity_vector)
+		print("x velocity %f m/s" % x_velocity)
+		print("y velocity %f m/s" % y_velocity)
+		print("z velocity %f m/s" % z_velocity)
+		print("\ninitial_velocity: %f m/s" % initial_velocity)
+
+		# calculate launch angle
+		launch_angle_degrees = py_ang(x_velocity_vector, initial_velocity_vector,radians=False)
+		print("Launch Angle Degrees %f" % launch_angle_degrees)
+
+
 		ax = plt.axes(projection='3d')
 		ax.set_aspect('equal')
-		scat = ax.scatter(shot_xs_meters, shot_ys_meters, shot_zs_meters)
-		ax.set_xlabel('Xs meters')
-		ax.set_ylabel('Ys meters')
-		ax.set_zlabel('Zs meters')
+		scat = ax.scatter(shot_xs_meters, shot_ys_meters, shot_zs_meters, c=(1,.45,0), edgecolors=(1,.3,0))
+		ax.set_xlabel('Xs meters', linespacing=3.2)
+		ax.set_ylabel('\tYs meters', linespacing=3.2)
+		ax.set_zlabel('\tZs meters', linespacing=3.2)
+		ax.yaxis.set_rotate_label(False) 
+		ax.zaxis.set_rotate_label(False) 
+		ax.tick_params(direction='out', length=2, width=1, colors='b', labelsize='small')
 		# Create cubic bounding box to simulate equal aspect ratio
 		max_range = np.array([shot_xs_meters.max()-shot_xs_meters.min(), shot_ys_meters.max()-shot_ys_meters.min(), shot_zs_meters.max()-shot_zs_meters.min()]).max()
 		Xb = 0.5*max_range*np.mgrid[-1:2:2,-1:2:2,-1:2:2][0].flatten() + 0.5*(shot_xs_meters.max()+shot_xs_meters.min())
@@ -1274,6 +1308,19 @@ if __name__ == '__main__':
 		# Comment or uncomment following both lines to test the fake bounding box:
 		for xb, yb, zb in zip(Xb, Yb, Zb):
 		   ax.plot([xb], [yb], [zb], 'w')
+
+		#component vectors
+		x_norm_vector = np.divide(x_velocity_vector,initial_velocity)
+		y_norm_vector = np.divide(y_velocity_vector,initial_velocity)
+		z_norm_vector = np.divide(z_velocity_vector,initial_velocity)
+		#ax.quiver(shot_xs_meters[0],shot_ys_meters[0],shot_zs_meters[0], x_norm_vector, y_norm_vector, z_norm_vector, 0) #, pivot='tail')
+		#ax.quiver(shot_xs_meters[0],shot_ys_meters[0],shot_zs_meters[0], x_norm_vector, y_norm_vector, z_norm_vector, pivot='tail')
+		figure_text = "Initial Velocity %f m/s\nLaunch Angle %f degrees" % (initial_velocity, launch_angle_degrees)
+		plt.figtext(.25, 0.125, figure_text, style='italic',
+        bbox={'facecolor':'blue', 'alpha':0.5, 'pad':10})
+		ax.view_init(elev=140, azim=-90)
+
+		ax.scatter(shot_xs_meters[0], shot_ys_meters[0], shot_zs_meters[0], c='None', s=100,edgecolors='g', linewidths=2)
 
 		plt.grid()
 		plt.show()
