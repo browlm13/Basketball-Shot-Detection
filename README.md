@@ -5,19 +5,22 @@ Our program is able to detect when a shot occurs and extrapolate the balls fligh
 
 ## Tracking and anylisis performed on 
 * unstable video
+
 ![Unstable Video](shot_1.gif)
-### Output world coordinates
+#### Program output world coordinates:
 ![world coordinates](shot_1_trajectory_extrapolation_points_v1.png)
 
-### Tracking and anylisis performed on 
+#### Tracking and anylisis performed on 
 * shot interrupted by person
+
 ![Shot with missing datapoints](shot_2.gif)
-### Output world coordinates
+#### Program output world coordinates:
 ![world coordinates](shot_2_trajectory_extrapolation_points_v1.png)
 
 ### Tracking and anylisis performed on 
 * shot interrupted by object
-* shot angled perpendicular to the camera plane
+* shot angled with component perpendicular to the camera plane
+
 ![Hits net piecewise linear regression](shot_16.gif)
-### Output world coordinates
+#### Program output world coordinates:
 ![world coordinates](shot_16_trajectory_extrapolation_points_v1.png)
