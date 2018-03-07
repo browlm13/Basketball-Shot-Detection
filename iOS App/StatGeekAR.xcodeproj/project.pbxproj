@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		5A1DBC44204F627100C5A6BD /* VideoViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A1DBC43204F627100C5A6BD /* VideoViewController.swift */; };
+		5A1DBC46204F63D300C5A6BD /* VidTableViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A1DBC45204F63D300C5A6BD /* VidTableViewController.swift */; };
+		5A243FA7204F492B0001C4E4 /* VidTableViewCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A243FA6204F492B0001C4E4 /* VidTableViewCell.swift */; };
 		AF7DD4D31ED3AA28005C880E /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF7DD4D21ED3AA28005C880E /* AppDelegate.swift */; };
 		AF7DD4D51ED3AA28005C880E /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF7DD4D41ED3AA28005C880E /* ViewController.swift */; };
 		AF7DD4D81ED3AA28005C880E /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AF7DD4D61ED3AA28005C880E /* Main.storyboard */; };
@@ -15,6 +18,9 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		5A1DBC43204F627100C5A6BD /* VideoViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoViewController.swift; sourceTree = "<group>"; };
+		5A1DBC45204F63D300C5A6BD /* VidTableViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VidTableViewController.swift; sourceTree = "<group>"; };
+		5A243FA6204F492B0001C4E4 /* VidTableViewCell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VidTableViewCell.swift; sourceTree = "<group>"; };
 		AF7DD4CF1ED3AA28005C880E /* StatGeekAR.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = StatGeekAR.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AF7DD4D21ED3AA28005C880E /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		AF7DD4D41ED3AA28005C880E /* ViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ViewController.swift; path = "AV Foundation/ViewController.swift"; sourceTree = "<group>"; };
@@ -39,7 +45,10 @@
 			isa = PBXGroup;
 			children = (
 				AF7DD4D61ED3AA28005C880E /* Main.storyboard */,
+				5A1DBC43204F627100C5A6BD /* VideoViewController.swift */,
 				AF7DD4D41ED3AA28005C880E /* ViewController.swift */,
+				5A243FA6204F492B0001C4E4 /* VidTableViewCell.swift */,
+				5A1DBC45204F63D300C5A6BD /* VidTableViewController.swift */,
 				AF7DD4D91ED3AA28005C880E /* Assets.xcassets */,
 				AF7DD4D11ED3AA28005C880E /* AV Foundation */,
 				AF7DD4D01ED3AA28005C880E /* Products */,
@@ -138,7 +147,10 @@
 			buildActionMask = 2147483647;
 			files = (
 				AF7DD4D51ED3AA28005C880E /* ViewController.swift in Sources */,
+				5A243FA7204F492B0001C4E4 /* VidTableViewCell.swift in Sources */,
+				5A1DBC44204F627100C5A6BD /* VideoViewController.swift in Sources */,
 				AF7DD4D31ED3AA28005C880E /* AppDelegate.swift in Sources */,
+				5A1DBC46204F63D300C5A6BD /* VidTableViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
