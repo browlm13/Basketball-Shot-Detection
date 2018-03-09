@@ -129,7 +129,7 @@ frame_info_bundel_filepath = "/Users/ljbrown/Desktop/StatGeek/object_detection/%
 #output csv
 output_csv_filepath = "out3.csv"
 
-
+"""
 # load with pandas
 frame_info_bundel = pd.read_json(frame_info_bundel_filepath)
 column_names = ['frame', 'md5_hash', 'average_hash', 'image_path', 'image_width', 'image_height','category', 'score', 'x1', 'x2', 'y1', 'y2', 'evaluation_model']
@@ -157,4 +157,42 @@ for frame_path, frame_info in frame_info_bundel.items():
 		
 
 video_ann.to_csv(output_csv_filepath)
+"""
+
+# read csv file
+tracking_matrix = pd.read_csv(output_csv_filepath)
+
+# cdpm_basketball/person
+cdpm_basketball = pd.DataFrame(columns=['frame', 'score','x1', 'x2', 'y1', 'y2'])
+cdpm_person = pd.DataFrame(columns=['frame', 'score','x1', 'x2', 'y1', 'y2'])
+
+# iterate over frames
+min_frame = int(tracking_matrix.loc[tracking_matrix['frame'].idxmin()][['frame']])
+max_frame = int(tracking_matrix.loc[tracking_matrix['frame'].idxmax()][['frame']])
+for frame in range(min_frame, max_frame+1):
+
+	# frame_info
+	frame_info = tracking_matrix.loc[tracking_matrix['frame'] == frame]
+
+	# top basketball
+	frame_basketballs = frame_info.loc[frame_info['category'] == "basketball"][['frame', 'score','x1', 'x2', 'y1', 'y2']]
+	sorted_basketballs = frame_basketballs.sort('score', ascending=False)
+	r,c = sorted_basketballs.shape
+	if r >0:
+		cdpm_basketball = cdpm_basketball.append(sorted_basketballs.iloc[0])
+
+	# top person
+	frame_people = frame_info.loc[frame_info['category'] == "person"][['frame', 'score','x1', 'x2', 'y1', 'y2']]
+	sorted_people = frame_people.sort('score', ascending=False)
+	r,c = sorted_people.shape
+	if r >0:
+		cdpm_person = cdpm_person.append(sorted_people.iloc[0])
+
+"""
+basketball_boxes = [(x1,x2,y1,y2) for (x1,x2,y1,y2) in cdpm_basketball[['x1', 'x2', 'y1', 'y2']].values]
+person_boxes = [(x1,x2,y1,y2) for (x1,x2,y1,y2) in cdpm_person[['x1', 'x2', 'y1', 'y2']].values]
+"""
+cdpm_basketball.columns = ['frame', 'bscore','bx1', 'bx2', 'by1', 'by2']
+cdpm_person.columns = ['frame', 'pscore','px1', 'px2', 'py1', 'py2']
+print(pd.merge(cdpm_basketball,cdpm_person, how='outer'))
 
