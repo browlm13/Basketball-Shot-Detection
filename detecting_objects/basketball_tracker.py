@@ -13,6 +13,11 @@ from PIL import Image
 import imagehash 		# for near duplicates
 import hashlib
 
+# logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
 """
 Mock 1 Basketball Tracking Matrix - single Ball
 
@@ -117,82 +122,140 @@ def frame_number(frame_path):
 
 	return frame
 
+def box_area(box):
+	"""
+	:param box: tuple (x1,x2,y1,y2)
+	:returns: area of box
+	"""
+	(left, right, top, bottom) = box
+	return (right-left) * (bottom-top)
+
+def iou(box1, box2):
+	"""
+	:param box1: tuple (x1,x2,y1,y2)
+	:param box2: tuple (x1,x2,y1,y2)
+	:return: Intersection over union" of two bounding boxes as float (0,1)
+	"""
+
+	#return "intersection over union" of two bounding boxes as float (0,1)
+	paired_boxes = tuple(zip(box1, box2))
+
+	# find intersecting box
+	intersecting_box = (max(paired_boxes[0]), min(paired_boxes[1]), max(paired_boxes[2]), min(paired_boxes[3]))
+
+	# adjust for min functions
+	if (intersecting_box[1] < intersecting_box[0]) or (intersecting_box[3] < intersecting_box[2]):
+		return 0.0
+
+	# compute the intersection over union
+	return box_area(intersecting_box)  / float( box_area(box1) + box_area(box2) - box_area(intersecting_box) )
+
+
+def read_shot_info_matrix(file_path):
+	# read csv file
+	tracking_matrix = pd.read_csv(file_path)
+
+	# ignore score, image path, md5 hash and average hash
+
+	# change frame from float to int
+	tracking_matrix['frame'] = tracking_matrix['frame'].astype("int")
+
+	# creat full frame dataframe and remove duplicates
+	frames = tracking_matrix[['frame']]
+	total_frames_df = frames.drop_duplicates(subset=['frame'], keep='first').sort('frame')
+
+	# initial annotation object columns
+	retrieved_columns=['frame', 'x1', 'x2', 'y1', 'y2']
+
+	#made need to ensure only one bb or player is chosen for each frame
+	basketball_tracking_matrix = tracking_matrix.loc[tracking_matrix['category'] == "basketball"][retrieved_columns].sort('frame', ascending=True)
+	person_tracking_matrix = tracking_matrix.loc[tracking_matrix['category'] == "person"][retrieved_columns].sort('frame', ascending=True)
+
+	# retrieve basketball and person indepented dfs
+	# inner join for iou calculation
+	basketball_columns = ['frame', 'bx1', 'bx2', 'by1', 'by2']
+	basketball_columns = ['frame', 'px1', 'px2', 'py1', 'py2']
+	basketball_tracking_matrix.columns = basketball_columns
+	person_tracking_matrix.columns = basketball_columns
+
+	inner_bp_tracking_matrix = pd.merge(basketball_tracking_matrix,person_tracking_matrix, how='inner', on=["frame"])
+
+	iou_dict = {'frame': [], 'iou': []}
+	for tuple_row in inner_bp_tracking_matrix.itertuples(index=False, name=None):
+		iou_frame, bbox, pbox = tuple_row[0], tuple_row[1:5], tuple_row[5:]
+		iou_val = iou(bbox, pbox)
+		iou_dict['frame'].append(iou_frame)
+		iou_dict['iou'].append(iou_val)
+	
+	iou_matrix = pd.DataFrame(iou_dict)
+
+	# calculate ball radii
+	
+
+	# join all dataframes
+	boxes_iou_matrix = pd.merge(inner_bp_tracking_matrix, iou_matrix, how='left', on=['frame'])
+	frame_ball_tracking_matrix = pd.merge(total_frames_df, boxes_iou_matrix, how='outer', on=['frame'])
+	
+	# set frame as index
+	frame_ball_tracking_matrix.set_index(['frame'], inplace=True)
+	print(frame_ball_tracking_matrix)
+
+
 ### testing
 
 model_collection_name = "basketball_model_v1" 
-shot_number = 16
 
-#input video frames directory path
-video_frames_dirpath = "/Users/ljbrown/Desktop/StatGeek/object_detection/video_frames/frames_shot_%s" % shot_number
-frame_info_bundel_filepath = "/Users/ljbrown/Desktop/StatGeek/object_detection/%s/image_evaluator_output/shot_%s_image_info_bundel.json" % (model_collection_name,shot_number)
+shots = [2] #range(1,4)
+for shot_number in shots:
 
-#output csv
-output_csv_filepath = "out3.csv"
+	#shot_number = 2
+	MIN_SCORE = 25
 
-"""
-# load with pandas
-frame_info_bundel = pd.read_json(frame_info_bundel_filepath)
-column_names = ['frame', 'md5_hash', 'average_hash', 'image_path', 'image_width', 'image_height','category', 'score', 'x1', 'x2', 'y1', 'y2', 'evaluation_model']
-video_ann = pd.DataFrame(columns=column_names)
+	#input video frames directory path
+	video_frames_dirpath = "/Users/ljbrown/Desktop/StatGeek/object_detection/video_frames/frames_shot_%s" % shot_number
+	video_frames_dirpath = "/Users/ljbrown/Desktop/StatGeek/object_detection/video_frames/frames_shot_%s" % shot_number
+	frame_info_bundel_filepath = "/Users/ljbrown/Desktop/StatGeek/object_detection/%s/image_evaluator_output/shot_%s_image_info_bundel.json" % (model_collection_name,shot_number)
+	csv_video_frame_output_file_path = "/Users/ljbrown/Desktop/StatGeek/object_detection/%s/image_evaluator_output/shot_%s_frame_info_matrix.csv" % (model_collection_name,shot_number)
 
-for frame_path, frame_info in frame_info_bundel.items():
-	frame = frame_number(frame_path)
-	md5_hash = image_hash(frame_path)
-	average_hash = image_hash(frame_path, perceptual=True)
-	image_width, image_height = frame_info["image_width"], frame_info["image_height"] #Image.open(frame_path).size
+	#output csv
+	output_csv_filepath = csv_video_frame_output_file_path
 
-	for detected_object in frame_info['image_items_list']:
-		category = detected_object['class']
-		score = float(detected_object['score'])
-		x1, x2, y1, y2 = detected_object['box']
+	"""
+	# load with pandas
+	frame_info_bundel = pd.read_json(frame_info_bundel_filepath)
+	column_names = ['frame', 'md5_hash', 'average_hash', 'image_path', 'image_width', 'image_height','category', 'score', 'x1', 'x2', 'y1', 'y2', 'evaluation_model']
+	video_ann = pd.DataFrame(columns=column_names)
 
-		# manual for this round
-		evaluation_model = model_collection_name
+	for frame_path, frame_info in frame_info_bundel.items():
+		frame = int(frame_number(frame_path))
+		md5_hash = image_hash(frame_path)
+		average_hash = image_hash(frame_path, perceptual=True)
+		image_width, image_height = frame_info["image_width"], frame_info["image_height"] #Image.open(frame_path).size
 
-		if (score > 15) and (category in ['person', 'basketball']):
-			row = [frame, md5_hash, average_hash, frame_path, image_width, image_height, category, score, x1, x2, y1, y2, evaluation_model]
-			pd_row = pd.DataFrame([row], columns=column_names)
-			print(pd_row)
-			video_ann = video_ann.append(pd_row)
-		
+		for detected_object in frame_info['image_items_list']:
+			category = detected_object['class']
+			score = float(detected_object['score'])
+			x1, x2, y1, y2 = detected_object['box']
 
-video_ann.to_csv(output_csv_filepath)
-"""
+			# manual for this round
+			evaluation_model = model_collection_name
 
-# read csv file
-tracking_matrix = pd.read_csv(output_csv_filepath)
+			if (score > MIN_SCORE) and (category in ['person', 'basketball']):
+				row = [frame, md5_hash, average_hash, frame_path, image_width, image_height, category, score, x1, x2, y1, y2, evaluation_model]
+				pd_row = pd.DataFrame([row], columns=column_names)
+				print(pd_row)
+				video_ann = video_ann.append(pd_row)
+				
 
-# cdpm_basketball/person
-cdpm_basketball = pd.DataFrame(columns=['frame', 'score','x1', 'x2', 'y1', 'y2'])
-cdpm_person = pd.DataFrame(columns=['frame', 'score','x1', 'x2', 'y1', 'y2'])
+	video_ann.to_csv(output_csv_filepath)
+	"""
 
-# iterate over frames
-min_frame = int(tracking_matrix.loc[tracking_matrix['frame'].idxmin()][['frame']])
-max_frame = int(tracking_matrix.loc[tracking_matrix['frame'].idxmax()][['frame']])
-for frame in range(min_frame, max_frame+1):
+for shot_number in shots:
 
-	# frame_info
-	frame_info = tracking_matrix.loc[tracking_matrix['frame'] == frame]
+	logger.info("logging shot number %d" % shot_number)
+	input_csv_filepath = csv_video_frame_output_file_path = "/Users/ljbrown/Desktop/StatGeek/object_detection/%s/image_evaluator_output/shot_%s_frame_info_matrix.csv" % (model_collection_name,shot_number)
+	read_shot_info_matrix(input_csv_filepath)
 
-	# top basketball
-	frame_basketballs = frame_info.loc[frame_info['category'] == "basketball"][['frame', 'score','x1', 'x2', 'y1', 'y2']]
-	sorted_basketballs = frame_basketballs.sort('score', ascending=False)
-	r,c = sorted_basketballs.shape
-	if r >0:
-		cdpm_basketball = cdpm_basketball.append(sorted_basketballs.iloc[0])
 
-	# top person
-	frame_people = frame_info.loc[frame_info['category'] == "person"][['frame', 'score','x1', 'x2', 'y1', 'y2']]
-	sorted_people = frame_people.sort('score', ascending=False)
-	r,c = sorted_people.shape
-	if r >0:
-		cdpm_person = cdpm_person.append(sorted_people.iloc[0])
 
-"""
-basketball_boxes = [(x1,x2,y1,y2) for (x1,x2,y1,y2) in cdpm_basketball[['x1', 'x2', 'y1', 'y2']].values]
-person_boxes = [(x1,x2,y1,y2) for (x1,x2,y1,y2) in cdpm_person[['x1', 'x2', 'y1', 'y2']].values]
-"""
-cdpm_basketball.columns = ['frame', 'bscore','bx1', 'bx2', 'by1', 'by2']
-cdpm_person.columns = ['frame', 'pscore','px1', 'px2', 'py1', 'py2']
-print(pd.merge(cdpm_basketball,cdpm_person, how='outer'))
 
