@@ -122,6 +122,7 @@ def frame_number(frame_path):
 
 	return frame
 
+
 def box_area(box):
 	"""
 	:param box: tuple (x1,x2,y1,y2)
@@ -150,6 +151,65 @@ def iou(box1, box2):
 	# compute the intersection over union
 	return box_area(intersecting_box)  / float( box_area(box1) + box_area(box2) - box_area(intersecting_box) )
 
+def get_ball_radius(ball_box, integer=True):
+	"""
+	:param ball_box: tupple (x1,x2,y1,y2)
+	:param integer: boolean, True by defualt
+	:returns: average between half the box's width and half the box's height, defualt returns int
+	"""
+	(left, right, top, bottom) = ball_box
+	xwidth = (right - left)/2
+	ywidth = (bottom - top)/2
+	radius = (xwidth + ywidth)/2
+
+	if integer: return int(radius)
+	return radius
+
+#use: matrix_with_bbox_pbox.apply(get_radii_dataframe, axis=1)
+def get_iou_dataframe(matrix_with_basketballand_person_boxes):
+	bbox = matrix_with_basketballand_person_boxes.loc[["bx1", 'bx2', 'by1', 'by2']]
+	pbox = matrix_with_basketballand_person_boxes.loc[["px1", 'px2', 'py1', 'py2']]
+	if (bbox.isnull().values.any()) or (pbox.isnull().values.any()) :
+		np.nan
+	return iou(bbox, pbox)
+
+#use: add_radii_column(matrix_with_bbox_pbox)
+def add_iou_column(matrix_with_basketballand_person_boxes):
+	return matrix_with_basketballand_person_boxes.assign(iou = matrix_with_basketballand_person_boxes.apply(get_iou_dataframe,axis=1).to_frame())
+
+#use: matrix_with_bbox.apply(get_radii_dataframe, axis=1)
+def get_radii_dataframe(matrix_with_basketball_boxes):
+	box = matrix_with_basketball_boxes.loc[["bx1", 'bx2', 'by1', 'by2']]
+	if box.isnull().values.any():
+		return np.nan
+	return get_ball_radius(box, integer=False)
+
+#use: add_radii_column(matrix_with_bbox)
+def add_radii_column(matrix_with_basketball_boxes):
+	return matrix_with_basketball_boxes.assign(radius = matrix_with_basketball_boxes.apply(get_radii_dataframe,axis=1).to_frame())
+
+#return pd.merge(matrix_with_basketball_boxes, get_radii_dataframe(matrix_with_basketball_boxes), how='left', on=['frame'])
+	
+#box = matrix_with_basketball_boxes.loc[["bx1", 'bx2', 'by1', 'by2']]
+"""
+#radius = np.nan
+#if not box.isnull().values.any():
+#	radius = get_ball_radius(box, integer=False)
+
+
+#return matrix_with_basketball_boxes.values + radius
+
+#matrix_with_basketball_boxes
+
+#radii = pd.DataFrame(data=radius)
+#return pd.concat([matrix_with_basketball_boxes, radii], axis=1, join='outer', on='frame')
+
+new = matrix_with_basketball_boxes.concat()
+if box.isnull().values.any():
+	return np.nan
+return get_ball_radius(box, integer=False)
+"""
+
 
 def read_shot_info_matrix(file_path):
 	# read csv file
@@ -174,12 +234,20 @@ def read_shot_info_matrix(file_path):
 	# retrieve basketball and person indepented dfs
 	# inner join for iou calculation
 	basketball_columns = ['frame', 'bx1', 'bx2', 'by1', 'by2']
-	basketball_columns = ['frame', 'px1', 'px2', 'py1', 'py2']
+	person_columns = ['frame', 'px1', 'px2', 'py1', 'py2']
 	basketball_tracking_matrix.columns = basketball_columns
-	person_tracking_matrix.columns = basketball_columns
+	person_tracking_matrix.columns = person_columns
 
 	inner_bp_tracking_matrix = pd.merge(basketball_tracking_matrix,person_tracking_matrix, how='inner', on=["frame"])
 
+	# add radii column
+	inner_bp_tracking_matrix = add_radii_column(inner_bp_tracking_matrix)
+
+	# add iou column
+	inner_bp_tracking_matrix = add_iou_column(inner_bp_tracking_matrix)
+
+	print (inner_bp_tracking_matrix)
+	"""
 	iou_dict = {'frame': [], 'iou': []}
 	for tuple_row in inner_bp_tracking_matrix.itertuples(index=False, name=None):
 		iou_frame, bbox, pbox = tuple_row[0], tuple_row[1:5], tuple_row[5:]
@@ -188,17 +256,24 @@ def read_shot_info_matrix(file_path):
 		iou_dict['iou'].append(iou_val)
 	
 	iou_matrix = pd.DataFrame(iou_dict)
+	"""
 
-	# calculate ball radii
-	
 
 	# join all dataframes
-	boxes_iou_matrix = pd.merge(inner_bp_tracking_matrix, iou_matrix, how='left', on=['frame'])
-	frame_ball_tracking_matrix = pd.merge(total_frames_df, boxes_iou_matrix, how='outer', on=['frame'])
+	#boxes_iou_matrix = pd.merge(inner_bp_tracking_matrix, iou_matrix, how='left', on=['frame'])
+	#frame_ball_tracking_matrix = pd.merge(total_frames_df, boxes_iou_matrix, how='outer', on=['frame'])
 	
+
+	#print(add_radii_column(basketball_tracking_matrix))
+	#print(add_iou_column(inner_bp_tracking_matrix))
+
+
 	# set frame as index
-	frame_ball_tracking_matrix.set_index(['frame'], inplace=True)
-	print(frame_ball_tracking_matrix)
+	#frame_ball_tracking_matrix.set_index(['frame'], inplace=True)
+	#print(frame_ball_tracking_matrix)
+
+
+
 
 
 ### testing
