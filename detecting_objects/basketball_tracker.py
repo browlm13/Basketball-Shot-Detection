@@ -165,15 +165,31 @@ def get_ball_radius(ball_box, integer=True):
 	if integer: return int(radius)
 	return radius
 
-#use: matrix_with_bbox_pbox.apply(get_radii_dataframe, axis=1)
+#use: matrix_with_bbox_pbox.apply(get_iou_dataframe, axis=1)
+# 1 for person ball intersecting bounding boxes, 0 for no overlap
+def get_free_dataframe(matrix_with_basketballand_person_boxes):
+	bbox = matrix_with_basketballand_person_boxes.loc[["x1_basketball", 'x2_basketball', 'y1_basketball', 'y2_basketball']]
+	pbox = matrix_with_basketballand_person_boxes.loc[["x1_person", 'x2_person', 'y1_person', 'y2_person']]
+	if (bbox.isnull().values.any()) or (pbox.isnull().values.any()):
+		return np.nan
+	elif iou(bbox, pbox) > 0:
+		return 1
+	return 0	
+
+#use: add_free_column(matrix_with_bbox_pbox)
+def add_free_column(matrix_with_basketballand_person_boxes):
+	return matrix_with_basketballand_person_boxes.assign(free = matrix_with_basketballand_person_boxes.apply(get_free_dataframe,axis=1).to_frame())
+
+
+#use: matrix_with_bbox_pbox.apply(get_iou_dataframe, axis=1)
 def get_iou_dataframe(matrix_with_basketballand_person_boxes):
 	bbox = matrix_with_basketballand_person_boxes.loc[["x1_basketball", 'x2_basketball', 'y1_basketball', 'y2_basketball']]
 	pbox = matrix_with_basketballand_person_boxes.loc[["x1_person", 'x2_person', 'y1_person', 'y2_person']]
 	if (bbox.isnull().values.any()) or (pbox.isnull().values.any()) :
-		np.nan
+		return np.nan
 	return iou(bbox, pbox)
 
-#use: add_radii_column(matrix_with_bbox_pbox)
+#use: add_iou_column(matrix_with_bbox_pbox)
 def add_iou_column(matrix_with_basketballand_person_boxes):
 	return matrix_with_basketballand_person_boxes.assign(iou = matrix_with_basketballand_person_boxes.apply(get_iou_dataframe,axis=1).to_frame())
 
@@ -209,7 +225,9 @@ if box.isnull().values.any():
 	return np.nan
 return get_ball_radius(box, integer=False)
 """
-
+import matplotlib.pyplot as plt
+from matplotlib import style
+style.use('ggplot')
 
 def read_shot_info_matrix(file_path):
 
@@ -241,7 +259,11 @@ def read_shot_info_matrix(file_path):
 
 	#add iou to matrix
 	bpfri_matrix = add_iou_column(bpfr_matrix)
-	print(bpfri_matrix)
+
+	#add free bool to matrix
+	print(add_free_column(bpfri_matrix))
+
+
 
 	#.rename(columns={'x1': 'bx1', 'x2': 'bx2', 'y1': 'by1', 'y2': 'by2'}, inplace=True)
 	#.rename(columns={'x1': 'px1', 'x2': 'px2', 'y1': 'py1', 'p2': 'py2'}, inplace=True)
