@@ -123,6 +123,20 @@ def frame_number(frame_path):
 	return frame
 
 
+def get_box_center_point(box):
+	"""
+	:param ball_box: tupple (x1,x2,y1,y2)
+	:returns: Point (x,y) where x and y are half the box's width and height
+	"""
+	# 1/2 height, 1/2 width
+	(left, right, top, bottom) = box
+	width = int((right - left)/2)
+	x = left + width
+	height = int((bottom - top)/2)
+	y = top + height
+	return (x,y)
+
+
 def box_area(box):
 	"""
 	:param box: tuple (x1,x2,y1,y2)
@@ -164,6 +178,24 @@ def get_ball_radius(ball_box, integer=True):
 
 	if integer: return int(radius)
 	return radius
+
+
+#use: matrix_with_basketball_boxes.apply(get_basketball_box_center_dataframe, axis=1)
+def get_basketball_box_center_dataframe(matrix_with_basketball_boxes):
+	box = matrix_with_basketball_boxes.loc[["x1_basketball", 'x2_basketball', 'y1_basketball', 'y2_basketball']]
+	frame = matrix_with_basketball_boxes.loc["frame"]
+	if box.isnull().values.any():
+		x, y =  np.nan, np.nan
+	else:
+		x, y = get_box_center_point(box)
+
+	return pd.Series(data=[frame,x,y], index=['frame','x_basketball', 'y_basketball'])
+
+#use: add_radii_column(matrix_with_bbox)
+def add_basketball_box_center_column(matrix_with_basketball_boxes):
+	df = matrix_with_basketball_boxes.apply(get_basketball_box_center_dataframe,axis=1)
+	return pd.merge(matrix_with_basketball_boxes,df, on=['frame'], how='outer') #df
+
 
 #use: matrix_with_bbox_pbox.apply(get_iou_dataframe, axis=1)
 # 1 for person ball intersecting bounding boxes, 0 for no overlap
@@ -236,9 +268,10 @@ def read_shot_info_matrix(file_path):
 	bpfri_matrix = add_iou_column(bpfr_matrix)
 
 	#add free bool to matrix
-	print(add_free_column(bpfri_matrix).set_index("frame"))
+	bpfrif = add_free_column(bpfri_matrix)
 
-
+	# add ball centerpoint columns
+	print(add_basketball_box_center_column(bpfrif))
 
 	#.rename(columns={'x1': 'bx1', 'x2': 'bx2', 'y1': 'by1', 'y2': 'by2'}, inplace=True)
 	#.rename(columns={'x1': 'px1', 'x2': 'px2', 'y1': 'py1', 'p2': 'py2'}, inplace=True)
