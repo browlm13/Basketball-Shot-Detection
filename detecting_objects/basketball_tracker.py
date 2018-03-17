@@ -167,8 +167,8 @@ def get_ball_radius(ball_box, integer=True):
 
 #use: matrix_with_bbox_pbox.apply(get_radii_dataframe, axis=1)
 def get_iou_dataframe(matrix_with_basketballand_person_boxes):
-	bbox = matrix_with_basketballand_person_boxes.loc[["bx1", 'bx2', 'by1', 'by2']]
-	pbox = matrix_with_basketballand_person_boxes.loc[["px1", 'px2', 'py1', 'py2']]
+	bbox = matrix_with_basketballand_person_boxes.loc[["x1_basketball", 'x2_basketball', 'y1_basketball', 'y2_basketball']]
+	pbox = matrix_with_basketballand_person_boxes.loc[["x1_person", 'x2_person', 'y1_person', 'y2_person']]
 	if (bbox.isnull().values.any()) or (pbox.isnull().values.any()) :
 		np.nan
 	return iou(bbox, pbox)
@@ -179,7 +179,7 @@ def add_iou_column(matrix_with_basketballand_person_boxes):
 
 #use: matrix_with_bbox.apply(get_radii_dataframe, axis=1)
 def get_radii_dataframe(matrix_with_basketball_boxes):
-	box = matrix_with_basketball_boxes.loc[["bx1", 'bx2', 'by1', 'by2']]
+	box = matrix_with_basketball_boxes.loc[["x1_basketball", 'x2_basketball', 'y1_basketball', 'y2_basketball']]
 	if box.isnull().values.any():
 		return np.nan
 	return get_ball_radius(box, integer=False)
@@ -212,67 +212,46 @@ return get_ball_radius(box, integer=False)
 
 
 def read_shot_info_matrix(file_path):
+
 	# read csv file
 	tracking_matrix = pd.read_csv(file_path)
 
-	# ignore score, image path, md5 hash and average hash
+	# filter tracking matrix to used datapoints only
+	tracking_matrix= tracking_matrix[['frame','score','category', 'x1','x2','y1','y2']] 		#[['frame','score','category', 'image_width', "image_height"]]
 
 	# change frame from float to int
 	tracking_matrix['frame'] = tracking_matrix['frame'].astype("int")
 
-	# creat full frame dataframe and remove duplicates
-	frames = tracking_matrix[['frame']]
-	total_frames_df = frames.drop_duplicates(subset=['frame'], keep='first').sort('frame')
+	# mock_1_tracking_matrix (currently frames)
+	frames_tracking_matrix = tracking_matrix.drop_duplicates(subset=['frame']).sort(['frame'])['frame'].to_frame()
 
-	# initial annotation object columns
-	retrieved_columns=['frame', 'x1', 'x2', 'y1', 'y2']
+	# extract high score basketball and person from each frame
+	single_pb_matrix = tracking_matrix.drop_duplicates(subset=['frame','category'], keep='first').sort(['score'], ascending=False)
 
-	#made need to ensure only one bb or player is chosen for each frame
-	basketball_tracking_matrix = tracking_matrix.loc[tracking_matrix['category'] == "basketball"][retrieved_columns].sort('frame', ascending=True)
-	person_tracking_matrix = tracking_matrix.loc[tracking_matrix['category'] == "person"][retrieved_columns].sort('frame', ascending=True)
+	# group, rename, merge - exclude image_hight and width
+	single_pb_category_matrix = single_pb_matrix.groupby('category')
+	b_matrix = single_pb_category_matrix.get_group('basketball').drop(['category'], axis=1)
+	p_matrix = single_pb_category_matrix.get_group('person').drop(['category'], axis=1)
 
-	# retrieve basketball and person indepented dfs
-	# inner join for iou calculation
-	basketball_columns = ['frame', 'bx1', 'bx2', 'by1', 'by2']
-	person_columns = ['frame', 'px1', 'px2', 'py1', 'py2']
-	basketball_tracking_matrix.columns = basketball_columns
-	person_tracking_matrix.columns = person_columns
+	# merge basketball and person boxes with total frame range
+	bpf_matrix = pd.merge(frames_tracking_matrix , pd.merge(b_matrix, p_matrix,on='frame', how='outer', suffixes=('_basketball', '_person')))
 
-	inner_bp_tracking_matrix = pd.merge(basketball_tracking_matrix,person_tracking_matrix, how='inner', on=["frame"])
+	# add radius to matrix
+	bpfr_matrix = add_radii_column(bpf_matrix)
 
-	# add radii column
-	inner_bp_tracking_matrix = add_radii_column(inner_bp_tracking_matrix)
+	#add iou to matrix
+	bpfri_matrix = add_iou_column(bpfr_matrix)
+	print(bpfri_matrix)
 
-	# add iou column
-	inner_bp_tracking_matrix = add_iou_column(inner_bp_tracking_matrix)
-
-	print (inner_bp_tracking_matrix)
+	#.rename(columns={'x1': 'bx1', 'x2': 'bx2', 'y1': 'by1', 'y2': 'by2'}, inplace=True)
+	#.rename(columns={'x1': 'px1', 'x2': 'px2', 'y1': 'py1', 'p2': 'py2'}, inplace=True)
 	"""
-	iou_dict = {'frame': [], 'iou': []}
-	for tuple_row in inner_bp_tracking_matrix.itertuples(index=False, name=None):
-		iou_frame, bbox, pbox = tuple_row[0], tuple_row[1:5], tuple_row[5:]
-		iou_val = iou(bbox, pbox)
-		iou_dict['frame'].append(iou_frame)
-		iou_dict['iou'].append(iou_val)
-	
-	iou_matrix = pd.DataFrame(iou_dict)
+	#basketball_column_replacement_names = {'score': 'bscore', 'x1': 'bx1', 'x2': 'bx2', 'y1': 'by1', 'y2': 'by2'}
+	#person_column_replacement_names = {'score': 'pscore', 'x1': 'px1', 'x2': 'px2', 'y1': 'py1', 'y2': 'py2'}
+	#b_matrix.rename(columns=basketball_column_replacement_names, inplace=True)
+	#p_matrix.rename(columns=person_column_replacement_names, inplace=True)
+
 	"""
-
-
-	# join all dataframes
-	#boxes_iou_matrix = pd.merge(inner_bp_tracking_matrix, iou_matrix, how='left', on=['frame'])
-	#frame_ball_tracking_matrix = pd.merge(total_frames_df, boxes_iou_matrix, how='outer', on=['frame'])
-	
-
-	#print(add_radii_column(basketball_tracking_matrix))
-	#print(add_iou_column(inner_bp_tracking_matrix))
-
-
-	# set frame as index
-	#frame_ball_tracking_matrix.set_index(['frame'], inplace=True)
-	#print(frame_ball_tracking_matrix)
-
-
 
 
 
@@ -281,10 +260,10 @@ def read_shot_info_matrix(file_path):
 model_collection_name = "basketball_model_v1" 
 
 shots = [2] #range(1,4)
+"""
 for shot_number in shots:
 
-	#shot_number = 2
-	MIN_SCORE = 25
+	MIN_SCORE = 1
 
 	#input video frames directory path
 	video_frames_dirpath = "/Users/ljbrown/Desktop/StatGeek/object_detection/video_frames/frames_shot_%s" % shot_number
@@ -295,7 +274,7 @@ for shot_number in shots:
 	#output csv
 	output_csv_filepath = csv_video_frame_output_file_path
 
-	"""
+
 	# load with pandas
 	frame_info_bundel = pd.read_json(frame_info_bundel_filepath)
 	column_names = ['frame', 'md5_hash', 'average_hash', 'image_path', 'image_width', 'image_height','category', 'score', 'x1', 'x2', 'y1', 'y2', 'evaluation_model']
@@ -323,7 +302,7 @@ for shot_number in shots:
 				
 
 	video_ann.to_csv(output_csv_filepath)
-	"""
+"""
 
 for shot_number in shots:
 
