@@ -204,38 +204,13 @@ def get_radii_dataframe(matrix_with_basketball_boxes):
 def add_radii_column(matrix_with_basketball_boxes):
 	return matrix_with_basketball_boxes.assign(radius = matrix_with_basketball_boxes.apply(get_radii_dataframe,axis=1).to_frame())
 
-#return pd.merge(matrix_with_basketball_boxes, get_radii_dataframe(matrix_with_basketball_boxes), how='left', on=['frame'])
-	
-#box = matrix_with_basketball_boxes.loc[["bx1", 'bx2', 'by1', 'by2']]
-"""
-#radius = np.nan
-#if not box.isnull().values.any():
-#	radius = get_ball_radius(box, integer=False)
-
-
-#return matrix_with_basketball_boxes.values + radius
-
-#matrix_with_basketball_boxes
-
-#radii = pd.DataFrame(data=radius)
-#return pd.concat([matrix_with_basketball_boxes, radii], axis=1, join='outer', on='frame')
-
-new = matrix_with_basketball_boxes.concat()
-if box.isnull().values.any():
-	return np.nan
-return get_ball_radius(box, integer=False)
-"""
-import matplotlib.pyplot as plt
-from matplotlib import style
-style.use('ggplot')
-
 def read_shot_info_matrix(file_path):
 
 	# read csv file
 	tracking_matrix = pd.read_csv(file_path)
 
 	# filter tracking matrix to used datapoints only
-	tracking_matrix= tracking_matrix[['frame','score','category', 'x1','x2','y1','y2']] 		#[['frame','score','category', 'image_width', "image_height"]]
+	tracking_matrix= tracking_matrix[['frame','score','category', 'x1','x2','y1','y2', 'image_width', 'image_height', 'md5_hash', "average_hash"]] 		#[['frame','score','category', 'image_width', "image_height"]]
 
 	# change frame from float to int
 	tracking_matrix['frame'] = tracking_matrix['frame'].astype("int")
@@ -261,7 +236,7 @@ def read_shot_info_matrix(file_path):
 	bpfri_matrix = add_iou_column(bpfr_matrix)
 
 	#add free bool to matrix
-	print(add_free_column(bpfri_matrix))
+	print(add_free_column(bpfri_matrix).set_index("frame"))
 
 
 
