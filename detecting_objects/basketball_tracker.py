@@ -94,6 +94,9 @@ ROWS:
 
 """
 
+import pickle
+
+
 def image_hash(image_path, perceptual=False):
 	"""
 	:param image_path: path of image to hash
@@ -236,7 +239,7 @@ def get_radii_dataframe(matrix_with_basketball_boxes):
 def add_radii_column(matrix_with_basketball_boxes):
 	return matrix_with_basketball_boxes.assign(radius = matrix_with_basketball_boxes.apply(get_radii_dataframe,axis=1).to_frame())
 
-def read_shot_info_matrix(file_path):
+def read_object_detection_csv(file_path):
 
 	# read csv file
 	tracking_matrix = pd.read_csv(file_path)
@@ -255,7 +258,7 @@ def read_shot_info_matrix(file_path):
 
 	# group, rename, merge - exclude image_hight and width
 	single_pb_category_matrix = single_pb_matrix.groupby('category')
-	b_matrix = single_pb_category_matrix.get_group('basketball').drop(['category'], axis=1)
+	b_matrix = single_pb_category_matrix.get_group('basketball').drop(['category'], axis=1)   #key errors if not found
 	p_matrix = single_pb_category_matrix.get_group('person').drop(['category'], axis=1)
 
 	# merge basketball and person boxes with total frame range
@@ -271,25 +274,65 @@ def read_shot_info_matrix(file_path):
 	bpfrif = add_free_column(bpfri_matrix)
 
 	# add ball centerpoint columns
-	print(add_basketball_box_center_column(bpfrif))
+	bpfrifc = add_basketball_box_center_column(bpfrif)
 
-	#.rename(columns={'x1': 'bx1', 'x2': 'bx2', 'y1': 'by1', 'y2': 'by2'}, inplace=True)
-	#.rename(columns={'x1': 'px1', 'x2': 'px2', 'y1': 'py1', 'p2': 'py2'}, inplace=True)
-	"""
-	#basketball_column_replacement_names = {'score': 'bscore', 'x1': 'bx1', 'x2': 'bx2', 'y1': 'by1', 'y2': 'by2'}
-	#person_column_replacement_names = {'score': 'pscore', 'x1': 'px1', 'x2': 'px2', 'y1': 'py1', 'y2': 'py2'}
-	#b_matrix.rename(columns=basketball_column_replacement_names, inplace=True)
-	#p_matrix.rename(columns=person_column_replacement_names, inplace=True)
-
-	"""
+	return bpfrifc
 
 
+def save_mock1_tracking_csv_df(object_detection_csv_filepath, ouput_file_path):
 
-### testing
+	expanded_tracking_matrix = read_object_detection_csv(object_detection_csv_filepath)
+	tracking_matrix = expanded_tracking_matrix[['frame', 'x_basketball', 'y_basketball', 'radius', 'free']].set_index('frame')
+	print(tracking_matrix)
+	tracking_matrix.to_csv(ouput_file_path)
+
+def save_object_detection_csv(frame_info_bundel_filepath, output_file_path, MIN_SCORE=1):
+
+	# load with pandas
+	frame_info_bundel = pd.read_json(frame_info_bundel_filepath)
+	column_names = ['frame', 'md5_hash', 'average_hash', 'image_path', 'image_width', 'image_height','category', 'score', 'x1', 'x2', 'y1', 'y2', 'evaluation_model']
+	video_ann = pd.DataFrame(columns=column_names)
+
+	for frame_path, frame_info in frame_info_bundel.items():
+		frame = int(frame_number(frame_path))
+		md5_hash = image_hash(frame_path)
+		average_hash = image_hash(frame_path, perceptual=True)
+		image_width, image_height = frame_info["image_width"], frame_info["image_height"] #Image.open(frame_path).size
+
+		for detected_object in frame_info['image_items_list']:
+			category = detected_object['class']
+			score = float(detected_object['score'])
+			x1, x2, y1, y2 = detected_object['box']
+
+			# manual for this round
+			evaluation_model = model_collection_name
+
+			if (score > MIN_SCORE) and (category in ['person', 'basketball']):
+				row = [frame, md5_hash, average_hash, frame_path, image_width, image_height, category, score, x1, x2, y1, y2, evaluation_model]
+				pd_row = pd.DataFrame([row], columns=column_names)
+				print(pd_row)
+				video_ann = video_ann.append(pd_row)
+				
+	#output csv
+	video_ann.to_csv(output_file_path)
+
+
 
 model_collection_name = "basketball_model_v1" 
 
-shots = [2] #range(1,4)
+shots = range(11,18)
+for shot_number in shots:
+	frame_info_bundel_filepath = "/Users/ljbrown/Desktop/StatGeek/object_detection/%s/image_evaluator_output/shot_%s_image_info_bundel.json" % (model_collection_name,shot_number)
+	csv_video_frame_output_file_path = "/Users/ljbrown/Desktop/StatGeek/object_detection/%s/image_evaluator_output/shot_%s_frame_info_matrix.csv" % (model_collection_name,shot_number)
+	saved_mock1_tracking_matrix_file = "/Users/ljbrown/Desktop/StatGeek/object_detection/%s/image_evaluator_output/mock1_ball_tracking_matrix_%s.csv" % (model_collection_name,shot_number)
+
+	logger.info("logging shot number %d" % shot_number)
+	
+
+	save_object_detection_csv(frame_info_bundel_filepath, csv_video_frame_output_file_path)
+	save_mock1_tracking_csv_df(csv_video_frame_output_file_path, saved_mock1_tracking_matrix_file)
+
+
 """
 for shot_number in shots:
 
@@ -333,13 +376,14 @@ for shot_number in shots:
 
 	video_ann.to_csv(output_csv_filepath)
 """
-
+"""
 for shot_number in shots:
 
 	logger.info("logging shot number %d" % shot_number)
 	input_csv_filepath = csv_video_frame_output_file_path = "/Users/ljbrown/Desktop/StatGeek/object_detection/%s/image_evaluator_output/shot_%s_frame_info_matrix.csv" % (model_collection_name,shot_number)
-	read_shot_info_matrix(input_csv_filepath)
-
+	#read_shot_info_matrix(input_csv_filepath)
+	save_mock1_tracking_csv_df(input_csv_filepath, 'test111.csv')
+"""
 
 
 
