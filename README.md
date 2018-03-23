@@ -26,6 +26,7 @@ Our program is able to detect when a shot occurs and extrapolate the balls fligh
 ![world coordinates](shot_16_trajectory_extrapolation_points_v1.png)
 
 
+
 ## Formats for representing video frame object bounding boxes detected
 
 ### Object Line Format (OL) CSV file
@@ -57,7 +58,7 @@ Our program is able to detect when a shot occurs and extrapolate the balls fligh
 
 ### LabelImg Annotation Format (LI) XML file
 #### [link to LabelImg](https://github.com/tzutalin/labelImg)
-#### Each image has a corresponding LI.xml file contating all objects detected
+#### Each image has a corresponding LI.xml file containing all objects detected
 * This is used to verify the accuracy of the models detections
 * Multiple objects are possible for each image
 ```
@@ -108,6 +109,31 @@ Our program is able to detect when a shot occurs and extrapolate the balls fligh
 * frame in this repository is the **file** name minus its extension
 * **score** is ``100.0`` if annotated by a human
 * **model** is "human" if annotated by a human
+
+### Clip Info Bundel Format (CIB) JSON file
+#### output of image_evaluator
+```
+{
+	"PATH/TO/FRAME/IMAGE" : 
+
+	{
+
+		"image_path" 		: "PATH/TO/FRAME/IMAGE",
+		"image_folder" 		: "IMAGE_FOLDER"
+		"image_filename" 	: "IMAGE_FILENAME",
+		"image_height" 		: HEIGHT_IN_PIXELS (int),
+		"image_width" 		: WIDTH_IN_PIXELS (int),
+		"image_items_list" : 
+
+			[
+				"category" : "NAME",
+				"score" : ACCURACY_SCORE (float),
+				"box" : [x1,x2,y1,y2] (ints),
+				"model" : "EVALUATION_MODEL"
+			]
+	}
+}
+```
 
 ## Data Directory Structure
 ```
