@@ -1,7 +1,7 @@
 # Shot Detection
 
 ## AI Basketball Shot Detection and Analysis
-Our program is able to detect when a shot occurs and extrapolate the balls flight from captured data. The program calculates the balls initial velocity and launch angle. The program is able to determine the balls flight perpedicular to the camera plane (The z axis). The program is also able to detect when the balls flight is interupted by another object and will drop those data points. In the case of unstable video, the program currently calculates the balls trajectory relative to the person shooting the ball. In the future we will impliment more accurate stabilization techniques. Additional note: the program currently requires at least 2 data points of a shot to be captured to perform its anylisis.
+This program is able to detect when a shot occurs and extrapolate the balls flight from captured data. It calculates the balls initial velocity and launch angle. It is able to determine the balls flight perpedicular to the camera plane (The z axis). The program is also able to detect when the balls flight is interupted by another object and will drop those data points.
 
 ## Tracking and anylisis performed on 
 * unstable video
